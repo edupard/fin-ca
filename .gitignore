@@ -1,0 +1,8 @@
+.idea
+*.pyc
+/nasdaq_history.csv
+/nasdaq_raw_data.npz
+/nasdaq_raw_data_bak.npz
+/pl.csv
+/rbm
+/rbm_bak
