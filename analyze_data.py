@@ -486,16 +486,7 @@ def wealth_graph(t_hpr, b_hpr, t_stocks, b_stocks, w_exit_index):
             _rc_wealth = rc_wealth[w]
             writer.writerow((dt.strftime('%Y-%m-%d'), _wealth, _rc_wealth))
 
-
-
 prob_l = np.zeros((data_set_records), dtype=np.float)
-
-def linear(x, size, name, initializer=None, bias_init=0):
-    w = tf.get_variable(name + "/w", [x.get_shape()[1], size], initializer=initializer)
-    b = tf.get_variable(name + "/b", [size], initializer=tf.constant_initializer(bias_init))
-    return tf.matmul(x, w) + b
-    # return tf.nn.relu(tf.matmul(x, w) + b)
-
 
 rbmobject1 = RBM(17, 40, ['rbmw1', 'rbvb1', 'rbmhb1'], 0.001)
 
