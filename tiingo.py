@@ -12,10 +12,12 @@ def get_historical_data(ticker, start_date, end_date):
                                                                                                  '%Y-%m-%d'),
                                                                                              end_date.strftime(
                                                                                                  '%Y-%m-%d'))
-    print(req_uri)
-
+    # print(req_uri)
     response = requests.get(req_uri,
                             headers=headers)
+
     if response.ok:
         return response.json()
+    else:
+        print("{} response status code: {}".format(ticker, response.status_code))
     return None

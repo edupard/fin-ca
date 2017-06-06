@@ -1,14 +1,8 @@
 import csv
-from yahoo_finance import Share
 import datetime
-import threading
-import queue
-from enum import Enum
-import random
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
-from matplotlib.ticker import FormatStrFormatter
 import tensorflow as tf
 import scipy.stats as stats
 import math
@@ -16,6 +10,7 @@ import math
 from rbm import RBM
 from au import AutoEncoder
 from ffnn import FFNN
+from download_utils import load_npz_data, convert_to_mpl_time
 
 NUM_WEEKS = 12
 NUM_DAYS = 5
@@ -42,20 +37,9 @@ DDMMMYY_FMT = matplotlib.dates.DateFormatter('%y %b %d')
 
 YYYY_FMT = matplotlib.dates.DateFormatter('%Y')
 
-input = np.load('nasdaq_raw_data.npz')
-raw_dt = input['raw_dt']
-raw_data = input['raw_data']
+raw_dt, raw_data = load_npz_data('nasdaq_raw_data.npz')
 
-STOCKS = raw_data.shape[0]
-
-
-def reduce_time(arr):
-    for idx in range(arr.shape[0]):
-        dt = datetime.datetime.fromtimestamp(raw_dt[idx])
-        yield matplotlib.dates.date2num(dt)
-
-
-raw_mpl_dt = np.fromiter(reduce_time(raw_dt), dtype=np.float64)
+raw_mpl_dt = convert_to_mpl_time(raw_dt)
 
 g_a = raw_data[:, :, 4] * raw_data[:, :, 3]
 g_a_a = np.average(g_a, axis=0)
