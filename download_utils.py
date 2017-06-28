@@ -4,7 +4,7 @@ import threading
 import queue
 from enum import Enum
 import numpy as np
-import matplotlib
+import os
 
 from tiingo import get_historical_data
 
@@ -50,6 +50,9 @@ class Writer:
                             h = d['high']
                             l = d['low']
                             v = d['volume']
+                            volume = float(v)
+                            if volume == 0:
+                                continue
                             dt = d['date'].split("T")[0]
                             t = p.ticker
                             writer.writerow((t, dt, o, c, h, l, v))
@@ -114,7 +117,7 @@ def parse_tickers(file_name):
     return tickers, ticker_to_idx, idx_to_ticker
 
 
-def download_data(tickers, FILE_NAME, START_DATE, END_DATE, NUM_WORKERS=50):
+def download_data(tickers, FILE_NAME, START_DATE, END_DATE, NUM_WORKERS=20):
     writer = Writer(FILE_NAME, NUM_WORKERS)
     writer.start()
 
@@ -169,11 +172,9 @@ def load_npz_data(DUMP_FILE_NAME):
     raw_data = input['raw_data']
     return  raw_dt, raw_data
 
-def convert_to_mpl_time(raw_dt):
-    def reduce_time(arr):
-        for idx in range(arr.shape[0]):
-            dt = datetime.datetime.fromtimestamp(raw_dt[idx])
-            yield matplotlib.dates.date2num(dt)
 
-    raw_mpl_dt = np.fromiter(reduce_time(raw_dt), dtype=np.float64)
-    return raw_mpl_dt
+
+
+
+
+
