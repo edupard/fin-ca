@@ -11,7 +11,8 @@ from rbm import RBM
 from au import AutoEncoder
 from ffnn import FFNN
 from data_utils import filter_tradeable_stocks, convert_to_mpl_time, get_dates_for_daily_return, \
-    get_dates_for_weekly_return, get_tradeable_stock_indexes, get_close_prices, calc_z_score
+    get_date_for_enter_return, get_dates_for_weekly_return, get_tradeable_stock_indexes, get_close_prices, \
+    get_open_prices, calc_z_score
 from download_utils import load_npz_data
 from visualization import wealth_graph, confusion_matrix, hpr_analysis
 from visualization import plot_20_random_stock_prices, plot_traded_stocks_per_day
@@ -20,21 +21,11 @@ from nn import train_ae, train_ffnn, train_rbm, evaluate_ffnn
 NUM_WEEKS = 12
 NUM_DAYS = 5
 
-TRAIN_RBM = False
-RBM_EPOCH_TO_TRAIN = 50
-RBM_BATCH_SIZE = 10
+PERCENTILE = 1
+# TOP_N_STOCKS = 1
+# TOP_N_STOCKS = 8
+TOP_N_STOCKS = None
 
-TRAIN_AU = False
-LOAD_RBM_WEIGHTS = True
-AU_EPOCH_TO_TRAIN = 30
-AU_BATCH_SIZE = 10
-
-TRAIN_FFNN = False
-LOAD_AU_WEIGHTS = True
-FFNN_EPOCH_TO_TRAIN = 1000
-FFNN_BATCH_SIZE = 10
-
-PERCENTILE = 10
 
 raw_dt, raw_data = load_npz_data('data/nasdaq_raw_data.npz')
 
@@ -45,6 +36,7 @@ mask, traded_stocks = filter_tradeable_stocks(raw_data)
 # plot_20_random_stock_prices(raw_data, raw_mpl_dt)
 # plot_traded_stocks_per_day(traded_stocks, raw_mpl_dt)
 
+# TRAIN_UP_TO_DATE = datetime.datetime.strptime('2008-01-01', '%Y-%m-%d').date()
 TRAIN_UP_TO_DATE = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
 START_DATE = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
 END_DATE = datetime.datetime.strptime('2017-04-18', '%Y-%m-%d').date()
@@ -77,6 +69,7 @@ def append_data(data, _data):
 def make_array(value):
     return np.array([value]).astype(np.int32)
 
+
 while True:
     # iterate over weeks
     SUNDAY = SUNDAY + datetime.timedelta(days=7)
@@ -90,12 +83,17 @@ while True:
     # continue if all data not availiable yet
     d_r_i = get_dates_for_daily_return(START_DATE, END_DATE, traded_stocks, SUNDAY - datetime.timedelta(days=7),
                                        NUM_DAYS)
+    ent_r_i = get_date_for_enter_return(START_DATE, END_DATE, traded_stocks,
+                                        SUNDAY - datetime.timedelta(days=7) + datetime.timedelta(days=1))
+
     if d_r_i is None:
         continue
 
-    t_s_i = get_tradeable_stock_indexes(mask, w_r_i, d_r_i)
+    # t_s_i = get_tradeable_stock_indexes(mask, w_r_i + d_r_i)
+    t_s_i = get_tradeable_stock_indexes(mask, w_r_i + d_r_i + ent_r_i)
     d_c = get_close_prices(raw_data, t_s_i, d_r_i)
     w_c = get_close_prices(raw_data, t_s_i, w_r_i)
+    ent_px = get_open_prices(raw_data, t_s_i, ent_r_i)
 
     # calc daily returns
     d_n_r = calc_z_score(d_c)
@@ -132,14 +130,9 @@ while True:
         train_records += num_stocks
         train_weeks += 1
 
-if TRAIN_RBM:
-    train_rbm(train_records, dr, wr)
-
-if TRAIN_AU:
-    train_ae(train_records, dr, wr)
-
-if TRAIN_FFNN:
-    train_ffnn(train_records, dr, wr, c_l, c_s)
+train_rbm(train_records, dr, wr)
+train_ae(train_records, dr, wr)
+train_ffnn(train_records, dr, wr, c_l, c_s, w_data_index, w_num_stocks)
 
 prob_l = np.zeros((data_set_records), dtype=np.float)
 evaluate_ffnn(data_set_records, dr, wr, prob_l)
@@ -173,6 +166,12 @@ def calc_classes_and_decisions(data_set_records, total_weeks, data):
 
         top_bound = np.percentile(_data, 100 - PERCENTILE)
         bottom_bound = np.percentile(_data, PERCENTILE)
+
+        if TOP_N_STOCKS is not None:
+            _data_sorted = np.sort(_data)
+            bottom_bound = _data_sorted[TOP_N_STOCKS - 1]
+            top_bound = _data_sorted[-TOP_N_STOCKS]
+
         _s_s_l = s_l[beg: end]
         _s_s_s = s_s[beg: end]
         long_cond = _data >= top_bound
@@ -187,6 +186,7 @@ def calc_classes_and_decisions(data_set_records, total_weeks, data):
         top_stocks_num[w_i] = l_hpr.shape[0]
         bottom_stocks_num[w_i] = s_hpr.shape[0]
     return c_l, c_s, top_hpr, bottom_hpr, top_stocks_num, bottom_stocks_num
+
 
 # s_c_l, s_c_s, t_hpr, b_hpr, t_stocks, b_stocks = calc_classes_and_decisions(
 #     data_set_records, total_weeks, wr[:, NUM_WEEKS - 1]
@@ -204,6 +204,7 @@ confusion_matrix(c_l[train_records:], c_s[train_records:], e_c_l[train_records:]
 hpr_analysis(t_e_hpr[train_weeks:], b_e_hpr[train_weeks:])
 wealth_graph(t_e_hpr[train_weeks:],
              b_e_hpr[train_weeks:],
+             w_enter_index[train_weeks:],
              w_exit_index[train_weeks:],
              raw_mpl_dt,
              raw_dt)
