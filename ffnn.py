@@ -3,13 +3,16 @@ from utilsnn import xavier_init
 
 
 class FFNN(object):
-    def __init__(self, input_size, layer_sizes, layer_names, optimizer=tf.train.AdamOptimizer(),
+    def __init__(self, RANDOM_INIT, ALL_WEIGHTS_TRAINABLE, input_size, layer_sizes, layer_names,
+                 optimizer=tf.train.AdamOptimizer(),
                  transfer_function=tf.nn.sigmoid):
 
+        self.RANDOM_INIT = RANDOM_INIT
+        self.ALL_WEIGHTS_TRAINABLE = ALL_WEIGHTS_TRAINABLE
         self.layer_names = layer_names
 
         # Build the encoding layers
-        self.x = tf.placeholder("float", [None, input_size])
+        self.x = tf.placeholder(tf.float32, [None, input_size])
         next_layer_input = self.x
 
         assert len(layer_sizes) == len(layer_names)
@@ -22,10 +25,11 @@ class FFNN(object):
 
             # Initialize W using xavier initialization
             # W = tf.get_variable(name=layer_names[i][0],shape=(input_dim, dim),dtype=tf.float32,initializer=tf.contrib.layers.xavier_initializer())
-            W = tf.Variable(xavier_init(input_dim, dim, transfer_function), name=layer_names[i][0])
+            W = tf.Variable(xavier_init(input_dim, dim, transfer_function, self.RANDOM_INIT), name=layer_names[i][0],
+                            trainable=self.ALL_WEIGHTS_TRAINABLE)
 
             # Initialize b to zero
-            b = tf.Variable(tf.zeros([dim]), name=layer_names[i][1])
+            b = tf.Variable(tf.zeros([dim]), name=layer_names[i][1], trainable=self.ALL_WEIGHTS_TRAINABLE)
 
             # We are going to use tied-weights so store the W matrix for later reference.
             self.encoding_matrices.append(W)
@@ -44,7 +48,7 @@ class FFNN(object):
         self.ff_biases = []
         # W = tf.get_variable(name="ffw1", shape=(4, 50), dtype=tf.float32,
         #                     initializer=tf.contrib.layers.xavier_initializer())
-        W = tf.Variable(xavier_init(4, 50, transfer_function), name="ffw1")
+        W = tf.Variable(xavier_init(4, 50, transfer_function, self.RANDOM_INIT), name="ffw1")
         b = tf.Variable(tf.zeros([50]), name="ffb1")
         self.ff_matrices.append(W)
         self.ff_biases.append(b)
@@ -53,7 +57,7 @@ class FFNN(object):
 
         # W = tf.get_variable(name="ffw2", shape=(50, 2), dtype=tf.float32,
         #                     initializer=tf.contrib.layers.xavier_initializer())
-        W = tf.Variable(xavier_init(50, 2, transfer_function), name="ffw2")
+        W = tf.Variable(xavier_init(50, 2, transfer_function, self.RANDOM_INIT), name="ffw2")
         b = tf.Variable(tf.zeros([2]), name="ffb2")
         self.ff_matrices.append(W)
         self.ff_biases.append(b)

@@ -67,9 +67,25 @@ def get_dates_for_daily_return(start_date, end_date, traded_stocks, sunday, n_d)
             return None
     return dates[::-1]
 
-def get_tradeable_stock_indexes(mask, w_r_i, d_r_i):
+def get_date_for_enter_return(start_date, end_date, traded_stocks, monday):
+    dates = []
+    data_idx = get_data_idx(monday, start_date, end_date)
+    end_data_idx = get_data_idx(end_date, start_date, end_date)
+    if data_idx is None:
+        return None
+    populated = 0
+    while populated < 1:
+        if traded_stocks[data_idx] > 0:
+            dates.append(data_idx)
+            populated += 1
+        data_idx += 1
+        if data_idx > end_data_idx:
+            return None
+    return dates[::-1]
+
+def get_tradeable_stock_indexes(mask, r_i):
     # stocks slice on days used to calculate returns
-    s_s = mask[:, w_r_i + d_r_i]
+    s_s = mask[:, r_i]
     # tradable stocks slice
     t_s = np.all(s_s, axis=1)
     # get tradable stocks indices
@@ -80,6 +96,12 @@ def get_close_prices(raw_data, t_s_i, r_i):
     c = raw_data[:, r_i, :]
     c = c[t_s_i, :, :]
     c = c[:, :, 3]
+    return c
+
+def get_open_prices(raw_data, t_s_i, r_i):
+    c = raw_data[:, r_i, :]
+    c = c[t_s_i, :, :]
+    c = c[:, :, 0]
     return c
 
 def calc_z_score(c):

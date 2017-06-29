@@ -1,5 +1,7 @@
 import numpy as np
 import tensorflow as tf
+
+
 # import sklearn.preprocessing as prep
 # import Image
 # from util import tile_raster_images
@@ -31,7 +33,9 @@ import tensorflow as tf
 #     return (X_train - mean) / std, (X_test - mean) / std
 
 
-def xavier_init(fan_in, fan_out, function):
+def xavier_init(fan_in, fan_out, function, random_init=True):
+    if not random_init:
+        return tf.zeros((fan_in, fan_out), dtype=tf.float32)
     if function is tf.nn.sigmoid:
         low = -4.0 * np.sqrt(6.0 / (fan_in + fan_out))
         high = 4.0 * np.sqrt(6.0 / (fan_in + fan_out))
