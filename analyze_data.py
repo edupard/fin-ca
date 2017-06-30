@@ -21,7 +21,7 @@ from nn import train_ae, train_ffnn, train_rbm, evaluate_ffnn
 NUM_WEEKS = 12
 NUM_DAYS = 5
 
-PERCENTILE = 1
+PERCENTILE = 15
 # TOP_N_STOCKS = 1
 # TOP_N_STOCKS = 8
 TOP_N_STOCKS = None
@@ -50,6 +50,7 @@ data_set_records = 0
 dr = None
 wr = None
 hpr = None
+hpr_real = None
 c_l = None
 c_s = None
 stocks = None
@@ -93,7 +94,7 @@ while True:
     t_s_i = get_tradeable_stock_indexes(mask, w_r_i + d_r_i + ent_r_i)
     d_c = get_close_prices(raw_data, t_s_i, d_r_i)
     w_c = get_close_prices(raw_data, t_s_i, w_r_i)
-    ent_px = get_open_prices(raw_data, t_s_i, ent_r_i)
+    ent_px = get_close_prices(raw_data, t_s_i, ent_r_i)
 
     # calc daily returns
     d_n_r = calc_z_score(d_c)
@@ -103,6 +104,8 @@ while True:
 
     _hpr = (w_c[:, NUM_WEEKS + 1] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
     hpr = append_data(hpr, _hpr)
+    _hpr_real = (w_c[:, NUM_WEEKS + 1] - ent_px[:, 0]) / ent_px[:, 0]
+    hpr_real = append_data(hpr_real, _hpr_real)
 
     hpr_med = np.median(_hpr)
     _c_l = _hpr >= hpr_med
@@ -179,8 +182,11 @@ def calc_classes_and_decisions(data_set_records, total_weeks, data):
         _s_s_l |= long_cond
         _s_s_s |= short_cond
         _hpr = hpr[beg: end]
+        _hpr_real = hpr_real[beg: end]
         l_hpr = _hpr[_s_s_l]
         s_hpr = _hpr[_s_s_s]
+        l_hpr = _hpr_real[_s_s_l]
+        s_hpr = _hpr_real[_s_s_s]
         top_hpr[w_i] = np.mean(l_hpr)
         bottom_hpr[w_i] = np.mean(s_hpr)
         top_stocks_num[w_i] = l_hpr.shape[0]
