@@ -1,6 +1,6 @@
 from download_utils import download_data, parse_tickers, preprocess_data, load_npz_data
 from data_utils import filter_tradeable_stocks, get_dates_for_daily_return, get_dates_for_weekly_return, \
-    get_tradeable_stock_indexes, get_close_prices, calc_z_score, get_data_idx
+    get_tradeable_stock_indexes, get_prices, PxType, calc_z_score, get_data_idx
 import datetime
 import numpy as np
 import csv
@@ -38,8 +38,8 @@ mask, traded_stocks = filter_tradeable_stocks(raw_data)
 w_r_i = get_dates_for_weekly_return(START_DATE, END_DATE, traded_stocks, PREDICTION_DATE, NUM_WEEKS)
 d_r_i = get_dates_for_daily_return(START_DATE, END_DATE, traded_stocks, PREDICTION_DATE, NUM_DAYS)
 t_s_i = get_tradeable_stock_indexes(mask, w_r_i + d_r_i)
-d_c = get_close_prices(raw_data, t_s_i, d_r_i)
-w_c = get_close_prices(raw_data, t_s_i, w_r_i)
+d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE)
+w_c = get_prices(raw_data, t_s_i, w_r_i, PxType.CLOSE)
 dr = calc_z_score(d_c)
 wr = calc_z_score(w_c)
 
@@ -71,11 +71,11 @@ CSV_ONE_DAY_DATE = get_csv_date_string(ONE_DAY_RETURN_IDX)
 CSV_PREDICATION_DATE = get_csv_date_string(PREDICTION_DATE_IDX)
 CSV_HPR_DATE = get_csv_date_string(HPR_DATE_IDX)
 
-
 with open('./data/prediction.csv', 'w', newline='') as f:
     writer = csv.writer(f)
     writer.writerow(
-        ('ticker', 'long prob', 'class', '1w', '1d', '*', 'hp', '1w px', '1d px', '* px', 'hp px', '1wr pct', '1dr pct', 'hpr pct','1d v', '1w avg v'))
+        ('ticker', 'long prob', 'class', '1w', '1d', '*', 'hp', '1w px', '1d px', '* px', 'hp px', '1wr pct', '1dr pct',
+         'hpr pct', '1d v', '1w avg v'))
 
     for idx in sorted_indexes:
         ticker_idx = t_s_i[idx]
@@ -95,7 +95,6 @@ with open('./data/prediction.csv', 'w', newline='') as f:
         _week_gross_volume = raw_data[ticker_idx, d_r_i[1:], 3] * raw_data[ticker_idx, d_r_i[1:], 4]
         _last_day_gross_volume = _week_gross_volume[4]
         _week_avg_gross_volume = np.average(_week_gross_volume)
-
 
 
         def get_pct(enter_px, exit_px):

@@ -2,6 +2,8 @@ import matplotlib
 import datetime
 import numpy as np
 
+from enum import Enum
+
 def filter_tradeable_stocks(raw_data):
     g_a = raw_data[:, :, 4] * raw_data[:, :, 3]
     mask = g_a[:, :] > 10000000
@@ -92,16 +94,20 @@ def get_tradeable_stock_indexes(mask, r_i):
     t_s_i = np.where(t_s)[0]
     return t_s_i
 
-def get_close_prices(raw_data, t_s_i, r_i):
-    c = raw_data[:, r_i, :]
-    c = c[t_s_i, :, :]
-    c = c[:, :, 3]
-    return c
+class PxType(Enum):
+    OPEN = 0
+    CLOSE = 1
 
-def get_open_prices(raw_data, t_s_i, r_i):
+def get_prices(raw_data, t_s_i, r_i, px_type: PxType):
+    type_to_idx = {
+        PxType.OPEN: 0,
+        PxType.CLOSE: 3
+    }
+
+    px_idx = type_to_idx.get(px_type, 3)
     c = raw_data[:, r_i, :]
     c = c[t_s_i, :, :]
-    c = c[:, :, 0]
+    c = c[:, :, px_idx]
     return c
 
 def calc_z_score(c):
