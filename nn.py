@@ -21,6 +21,8 @@ FFNN_BATCH_SIZE = 10
 RANDOM_INIT = True
 ALL_WEIGHTS_TRAINABLE = True
 
+SAVE_EACH_N_EPOCHS = 500
+
 
 def rbm_instance():
     rbmobject1 = RBM(17, 40, ['rbmw1', 'rbvb1', 'rbmhb1'], 0.001)
@@ -178,7 +180,7 @@ def train_ffnn(train_records, dr, wr, c_l, c_s, w_data_index, w_num_stocks):
                     print('.', sep=' ', end='', flush=True)
                     curr_progress = progress
             print(" Epoch {} cost: {:.6f}".format(i, epoch_cost / batches_per_epoch))
-            if i % 10 == 0:
+            if i % SAVE_EACH_N_EPOCHS == 0:
                 print("Model saved")
                 ffnn.save_weights('./rbm/ffnn.chp')
     else:
@@ -208,7 +210,7 @@ def train_ffnn(train_records, dr, wr, c_l, c_s, w_data_index, w_num_stocks):
                     print('.', sep=' ', end='', flush=True)
                     curr_progress = progress
             print(" Epoch {} cost: {:.6f}".format(i, epoch_cost / batches_per_epoch))
-            if i % 10 == 0:
+            if i % SAVE_EACH_N_EPOCHS == 0:
                 print("Model saved")
                 ffnn.save_weights('./rbm/ffnn.chp')
 

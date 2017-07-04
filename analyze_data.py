@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import tensorflow as tf
+from enum import Enum
 
 import math
 
@@ -21,10 +22,22 @@ from nn import train_ae, train_ffnn, train_rbm, evaluate_ffnn
 NUM_WEEKS = 12
 NUM_DAYS = 5
 
-TRADE_ON_MON = True
-MON_OPEN = False
+ENT_ON_MON = True
+ENT_MON_OPEN = True
+EXIT_ON_MON = False
+EXIT_ON_MON_OPEN = True
 
-PERCENTILE = 1
+
+class SelectionAlgo(Enum):
+    TOP = 0
+    BOTTOM = 1
+    MIDDLE = 2
+    MIDDLE_ALT = 3
+
+
+BET_PCT = 2
+SLCT_PCT = 100
+SLCT_ALG = SelectionAlgo.TOP
 # TOP_N_STOCKS = 1
 # TOP_N_STOCKS = 8
 TOP_N_STOCKS = None
@@ -39,7 +52,11 @@ mask, traded_stocks = filter_tradeable_stocks(raw_data)
 # plot_traded_stocks_per_day(traded_stocks, raw_mpl_dt)
 
 # TRAIN_UP_TO_DATE = datetime.datetime.strptime('2008-01-01', '%Y-%m-%d').date()
-TRAIN_UP_TO_DATE = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
+# TRAIN_UP_TO_DATE = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
+# TRAIN_UP_TO_DATE = datetime.datetime.strptime('2013-01-01', '%Y-%m-%d').date()
+# TRAIN_UP_TO_DATE = datetime.datetime.strptime('2015-01-01', '%Y-%m-%d').date()
+# TRAIN_UP_TO_DATE = datetime.datetime.strptime('2017-04-18', '%Y-%m-%d').date()
+TRAIN_UP_TO_DATE = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
 START_DATE = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
 END_DATE = datetime.datetime.strptime('2017-04-18', '%Y-%m-%d').date()
 SUNDAY = START_DATE + datetime.timedelta(days=7 - START_DATE.isoweekday())
@@ -53,6 +70,7 @@ dr = None
 wr = None
 hpr = None
 hpr_model = None
+int_r = None
 c_l = None
 c_s = None
 stocks = None
@@ -83,27 +101,40 @@ while True:
     # continue if all data not availiable yet
     if w_r_i is None:
         continue
-    # continue if all data not availiable yet
     d_r_i = get_dates_for_daily_return(START_DATE, END_DATE, traded_stocks, SUNDAY - datetime.timedelta(days=7),
                                        NUM_DAYS)
-    if TRADE_ON_MON:
+    # continue if all data not availiable yet
+    if d_r_i is None:
+        continue
+    if ENT_ON_MON:
         ent_r_i = get_date_for_enter_return(START_DATE, END_DATE, traded_stocks,
                                             SUNDAY - datetime.timedelta(days=7) + datetime.timedelta(days=1))
+        if ent_r_i is None:
+            continue
     else:
         ent_r_i = d_r_i[-1:]
 
-    if d_r_i is None:
-        continue
+    if EXIT_ON_MON:
+        ext_r_i = get_date_for_enter_return(START_DATE, END_DATE, traded_stocks,
+                                            SUNDAY + datetime.timedelta(days=1))
+        if ext_r_i is None:
+            continue
+    else:
+        ext_r_i = w_r_i[-1:]
 
     # t_s_i = get_tradeable_stock_indexes(mask, w_r_i + d_r_i)
-    t_s_i = get_tradeable_stock_indexes(mask, w_r_i + d_r_i + ent_r_i)
+    t_s_i = get_tradeable_stock_indexes(mask, w_r_i + d_r_i + ent_r_i + ext_r_i)
     d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE)
     w_c = get_prices(raw_data, t_s_i, w_r_i, PxType.CLOSE)
 
     px_type = PxType.CLOSE
-    if TRADE_ON_MON and MON_OPEN:
+    if ENT_ON_MON and ENT_MON_OPEN:
         px_type = PxType.OPEN
     ent_px = get_prices(raw_data, t_s_i, ent_r_i, px_type)
+    px_type = PxType.CLOSE
+    if EXIT_ON_MON and EXIT_ON_MON_OPEN:
+        px_type = PxType.OPEN
+    ext_px = get_prices(raw_data, t_s_i, ext_r_i, px_type)
 
     # calc daily returns
     d_n_r = calc_z_score(d_c)
@@ -113,8 +144,10 @@ while True:
 
     _hpr = (w_c[:, NUM_WEEKS + 1] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
     hpr = append_data(hpr, _hpr)
-    _hpr_model = (w_c[:, NUM_WEEKS + 1] - ent_px[:, 0]) / ent_px[:, 0]
+    _hpr_model = (ext_px[:, 0] - ent_px[:, 0]) / ent_px[:, 0]
     hpr_model = append_data(hpr_model, _hpr_model)
+    _int_r = (ent_px[:, 0] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
+    int_r = append_data(int_r, _int_r)
 
     hpr_med = np.median(_hpr)
     _c_l = _hpr >= hpr_med
@@ -176,8 +209,8 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _s_c_l |= pred_long_cond
         _s_c_s |= ~pred_long_cond
 
-        top_bound = np.percentile(_prob_l, 100 - PERCENTILE)
-        bottom_bound = np.percentile(_prob_l, PERCENTILE)
+        top_bound = np.percentile(_prob_l, 100 - BET_PCT)
+        bottom_bound = np.percentile(_prob_l, BET_PCT)
 
         if TOP_N_STOCKS is not None:
             _prob_l_sorted = np.sort(_prob_l)
@@ -193,9 +226,47 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         # _hpr = hpr[beg: end]
         # l_hpr = _hpr[_s_s_l]
         # s_hpr = _hpr[_s_s_s]
+        _int_r = int_r[beg:end]
+        l_int_r = _int_r[_s_s_l]
+        s_int_r = _int_r[_s_s_s]
+        l_int_r_sorted = np.sort(l_int_r)
+        s_int_r_sorted = np.sort(s_int_r)
+
+        if SLCT_ALG == SelectionAlgo.TOP:
+            l_int_r_t_b = np.max(l_int_r)
+            l_int_r_b_b = np.percentile(l_int_r, 100 - SLCT_PCT)
+        elif SLCT_ALG == SelectionAlgo.BOTTOM:
+            l_int_r_t_b = np.percentile(l_int_r, SLCT_PCT)
+            l_int_r_b_b = np.min(l_int_r)
+        elif SLCT_ALG == SelectionAlgo.MIDDLE:
+            l_int_r_t_b = np.percentile(l_int_r, 100 - SLCT_PCT / 2)
+            l_int_r_b_b = np.percentile(l_int_r, SLCT_PCT / 2)
+
+        if SLCT_ALG == SelectionAlgo.TOP:
+            s_int_r_t_b = np.percentile(s_int_r, SLCT_PCT)
+            s_int_r_b_b = np.min(s_int_r)
+        elif SLCT_ALG == SelectionAlgo.BOTTOM:
+            s_int_r_t_b = np.max(s_int_r)
+            s_int_r_b_b = np.percentile(s_int_r, 100 - SLCT_PCT)
+        elif SLCT_ALG == SelectionAlgo.MIDDLE:
+            s_int_r_t_b = np.percentile(s_int_r, 100 - SLCT_PCT / 2)
+            s_int_r_b_b = np.percentile(s_int_r, SLCT_PCT / 2)
+
+        sel_l_cond = _s_s_l
+        sel_l_cond &= _int_r >= l_int_r_b_b
+        sel_l_cond &= _int_r <= l_int_r_t_b
+
+        sel_s_cond = _s_s_s
+        sel_s_cond &= _int_r <= s_int_r_t_b
+        sel_s_cond &= _int_r >= s_int_r_b_b
         _hpr_model = hpr_model[beg: end]
-        l_hpr = _hpr_model[_s_s_l]
-        s_hpr = _hpr_model[_s_s_s]
+        l_hpr = _hpr_model[sel_l_cond]
+        s_hpr = _hpr_model[sel_s_cond]
+
+        # _hpr_model = hpr_model[beg: end]
+        # l_hpr = _hpr_model[_s_s_l]
+        # s_hpr = _hpr_model[_s_s_s]
+
         top_hpr[w_i] = np.mean(l_hpr)
         bottom_hpr[w_i] = np.mean(s_hpr)
         top_stocks_num[w_i] = l_hpr.shape[0]

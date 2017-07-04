@@ -20,18 +20,20 @@ PREDICTION_DATE = HPR_DATE - datetime.timedelta(days=HPR_DATE.isoweekday() + 2)
 # HPR_DATE = datetime.datetime.strptime('2017-06-09', '%Y-%m-%d').date()
 # PREDICTION_DATE = datetime.datetime.strptime('2017-06-09', '%Y-%m-%d').date()
 # HPR_DATE = datetime.datetime.strptime('2017-06-16', '%Y-%m-%d').date()
-PREDICTION_DATE = datetime.datetime.strptime('2017-06-16', '%Y-%m-%d').date()
-HPR_DATE = datetime.datetime.strptime('2017-06-23', '%Y-%m-%d').date()
+# PREDICTION_DATE = datetime.datetime.strptime('2017-06-16', '%Y-%m-%d').date()
+# HPR_DATE = datetime.datetime.strptime('2017-06-23', '%Y-%m-%d').date()
 # PREDICTION_DATE = datetime.datetime.strptime('2017-06-23', '%Y-%m-%d').date()
 # HPR_DATE = datetime.datetime.strptime('2017-06-27', '%Y-%m-%d').date()
+PREDICTION_DATE = datetime.datetime.strptime('2017-06-30', '%Y-%m-%d').date()
+HPR_DATE = datetime.datetime.strptime('2017-06-30', '%Y-%m-%d').date()
 
 
 START_DATE = PREDICTION_DATE - datetime.timedelta(days=(NUM_WEEKS + 2) * 7)
 END_DATE = HPR_DATE
 
 tickers, ticker_to_idx, idx_to_ticker = parse_tickers('data/tickers_nasdaq.csv')
-# download_data(tickers, 'data/history.csv', START_DATE, END_DATE, 50)
-# preprocess_data(ticker_to_idx, 'data/history.csv', START_DATE, END_DATE, 'data/history.npz')
+download_data(tickers, 'data/history.csv', START_DATE, END_DATE, 50)
+preprocess_data(ticker_to_idx, 'data/history.csv', START_DATE, END_DATE, 'data/history.npz')
 raw_dt, raw_data = load_npz_data('data/history.npz')
 mask, traded_stocks = filter_tradeable_stocks(raw_data)
 
@@ -49,7 +51,7 @@ ffnn.load_weights('./rbm/ffnn.chp')
 input = np.concatenate([wr, dr], axis=1)
 p_dist = ffnn.predict(input)
 p_l = p_dist[:, 0]
-# p_l = p_l - np.median(p_l) + 0.5
+p_l = p_l - np.median(p_l) + 0.5
 sorted_indexes = p_l.argsort()
 
 top_bound = np.percentile(p_l, 100 - PERCENTILE)

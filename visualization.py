@@ -227,9 +227,15 @@ def wealth_graph(t_hpr, b_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
     ax.xaxis_date()
     ax.set_title("Year pct return")
 
-    print("F: {:.2f} DD: {:.2f} SHARPE: {:.2f} AVG_YEAR: {:.2f} F_R: {:.2f} DD_R: {:.2f}".format(
+    w_dd = np.min(diff) * 100.0
+    w_r_avg = np.mean(diff) * 100.0
+    w_r_best = np.max(diff) * 100.0
+    print("F: {:.2f} DD: {:.2f} W_DD: {:.2f} W_AVG: {:.2f} W_BEST: {:.2f} SHARPE: {:.2f} AVG_YEAR: {:.2f} F_R: {:.2f} DD_R: {:.2f}".format(
         wealth[-1],
         dd,
+        w_dd,
+        w_r_avg,
+        w_r_best,
         sharp,
         yr_mean,
         rc_wealth[-1],
