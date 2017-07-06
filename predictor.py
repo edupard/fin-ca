@@ -25,7 +25,7 @@ PREDICTION_DATE = HPR_DATE - datetime.timedelta(days=HPR_DATE.isoweekday() + 2)
 # PREDICTION_DATE = datetime.datetime.strptime('2017-06-23', '%Y-%m-%d').date()
 # HPR_DATE = datetime.datetime.strptime('2017-06-27', '%Y-%m-%d').date()
 PREDICTION_DATE = datetime.datetime.strptime('2017-06-30', '%Y-%m-%d').date()
-HPR_DATE = datetime.datetime.strptime('2017-06-30', '%Y-%m-%d').date()
+HPR_DATE = datetime.datetime.strptime('2017-07-03', '%Y-%m-%d').date()
 
 
 START_DATE = PREDICTION_DATE - datetime.timedelta(days=(NUM_WEEKS + 2) * 7)
@@ -76,7 +76,7 @@ CSV_HPR_DATE = get_csv_date_string(HPR_DATE_IDX)
 with open('./data/prediction.csv', 'w', newline='') as f:
     writer = csv.writer(f)
     writer.writerow(
-        ('ticker', 'long prob', 'class', '1w', '1d', '*', 'hp', '1w px', '1d px', '* px', 'hp px', '1wr pct', '1dr pct',
+        ('ticker', 'long prob', 'class', '1w', '1d', '*', 'hp', '1w px', '1d px', '* px', 'hp px', 'hp open px', '1wr pct', '1dr pct',
          'hpr pct', '1d v', '1w avg v'))
 
     for idx in sorted_indexes:
@@ -93,6 +93,7 @@ with open('./data/prediction.csv', 'w', newline='') as f:
         _1d_px = raw_data[ticker_idx, ONE_DAY_RETURN_IDX, 3]
         _pred_px = raw_data[ticker_idx, PREDICTION_DATE_IDX, 3]
         _hp_px = raw_data[ticker_idx, HPR_DATE_IDX, 3]
+        _hp_open_px = raw_data[ticker_idx, HPR_DATE_IDX, 0]
 
         _week_gross_volume = raw_data[ticker_idx, d_r_i[1:], 3] * raw_data[ticker_idx, d_r_i[1:], 4]
         _last_day_gross_volume = _week_gross_volume[4]
@@ -118,6 +119,7 @@ with open('./data/prediction.csv', 'w', newline='') as f:
                          _1d_px,
                          _pred_px,
                          _hp_px,
+                         _hp_open_px,
                          _1wr_pct,
                          _1dr_pct,
                          _hpr_pct,

@@ -38,7 +38,7 @@ class SelectionAlgo(Enum):
 BET_PCT = 2
 SLCT_PCT = 100
 SLCT_ALG = SelectionAlgo.TOP
-# TOP_N_STOCKS = 1
+# TOP_N_STOCKS = 2
 # TOP_N_STOCKS = 8
 TOP_N_STOCKS = None
 
@@ -52,11 +52,11 @@ mask, traded_stocks = filter_tradeable_stocks(raw_data)
 # plot_traded_stocks_per_day(traded_stocks, raw_mpl_dt)
 
 # TRAIN_UP_TO_DATE = datetime.datetime.strptime('2008-01-01', '%Y-%m-%d').date()
-# TRAIN_UP_TO_DATE = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
+TRAIN_UP_TO_DATE = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
 # TRAIN_UP_TO_DATE = datetime.datetime.strptime('2013-01-01', '%Y-%m-%d').date()
 # TRAIN_UP_TO_DATE = datetime.datetime.strptime('2015-01-01', '%Y-%m-%d').date()
 # TRAIN_UP_TO_DATE = datetime.datetime.strptime('2017-04-18', '%Y-%m-%d').date()
-TRAIN_UP_TO_DATE = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
+# TRAIN_UP_TO_DATE = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
 START_DATE = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
 END_DATE = datetime.datetime.strptime('2017-04-18', '%Y-%m-%d').date()
 SUNDAY = START_DATE + datetime.timedelta(days=7 - START_DATE.isoweekday())
