@@ -4,6 +4,7 @@ import numpy as np
 
 from enum import Enum
 
+
 def filter_tradeable_stocks(raw_data):
     g_a = raw_data[:, :, 4] * raw_data[:, :, 3]
     mask = g_a[:, :] > 10000000
@@ -17,6 +18,7 @@ def filter_tradeable_stocks(raw_data):
     traded_stocks = mask[:, :].sum(0)
 
     return mask, traded_stocks
+
 
 def convert_to_mpl_time(raw_dt):
     def reduce_time(arr):
@@ -69,6 +71,7 @@ def get_dates_for_daily_return(start_date, end_date, traded_stocks, sunday, n_d)
             return None
     return dates[::-1]
 
+
 def get_date_for_enter_return(start_date, end_date, traded_stocks, monday):
     dates = []
     data_idx = get_data_idx(monday, start_date, end_date)
@@ -85,6 +88,7 @@ def get_date_for_enter_return(start_date, end_date, traded_stocks, monday):
             return None
     return dates[::-1]
 
+
 def get_tradeable_stock_indexes(mask, r_i):
     # stocks slice on days used to calculate returns
     s_s = mask[:, r_i]
@@ -94,9 +98,11 @@ def get_tradeable_stock_indexes(mask, r_i):
     t_s_i = np.where(t_s)[0]
     return t_s_i
 
+
 class PxType(Enum):
     OPEN = 0
     CLOSE = 1
+
 
 def get_prices(raw_data, t_s_i, r_i, px_type: PxType):
     type_to_idx = {
@@ -109,6 +115,7 @@ def get_prices(raw_data, t_s_i, r_i, px_type: PxType):
     c = c[t_s_i, :, :]
     c = c[:, :, px_idx]
     return c
+
 
 def calc_z_score(c):
     # calc returns

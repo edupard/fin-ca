@@ -1,16 +1,8 @@
-import csv
 import datetime
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib
-import tensorflow as tf
 from enum import Enum
 
-import math
-
-from rbm import RBM
-from au import AutoEncoder
-from ffnn import FFNN
 from data_utils import filter_tradeable_stocks, convert_to_mpl_time, get_dates_for_daily_return, \
     get_date_for_enter_return, get_dates_for_weekly_return, get_tradeable_stock_indexes, get_prices, \
     PxType, calc_z_score

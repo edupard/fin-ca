@@ -6,6 +6,7 @@ from enum import Enum
 import numpy as np
 import os
 
+
 from tiingo import get_historical_data
 
 tickers = []
@@ -50,15 +51,22 @@ class Writer:
                             h = d['high']
                             l = d['low']
                             v = d['volume']
+                            adj_o = d['adjOpen']
+                            adj_c = d['adjClose']
+                            adj_h = d['adjHigh']
+                            adj_l = d['adjLow']
+                            div_cash = d['divCash']
+                            split_factor = d['splitFactor']
+
                             volume = float(v)
                             if volume == 0:
                                 continue
                             dt = d['date'].split("T")[0]
                             t = p.ticker
-                            writer.writerow((t, dt, o, c, h, l, v))
+                            writer.writerow((t, dt, o, c, h, l, v, adj_o, adj_c, adj_h, adj_l, div_cash, split_factor))
                     except:
                         pass
-        print('download task completed')
+        print('download completed!')
 
     def start(self):
         self.thread.start()
@@ -121,7 +129,7 @@ def download_data(tickers, FILE_NAME, START_DATE, END_DATE, NUM_WORKERS=20):
     writer = Writer(FILE_NAME, NUM_WORKERS)
     writer.start()
 
-    tickers_per_worker = len(tickers) // NUM_WORKERS
+    tickers_per_worker = len(tickers) // NUM_WORKERS + 1
     for idx in range(NUM_WORKERS):
         tickers_slice = tickers[idx * tickers_per_worker: min((idx + 1) * tickers_per_worker, len(tickers))]
         worker = Worker(writer, tickers_slice, idx, START_DATE, END_DATE)
@@ -165,6 +173,81 @@ def preprocess_data(ticker_to_idx, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NA
 
     np.savez(DUMP_FILE_NAME, raw_dt=raw_dt, raw_data=raw_data)
     print('preprocess task completed')
+
+def preprocess_data_alt(tickers, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME, use_adj_px):
+    print('preprocessing data...')
+
+    ticker_to_idx = {}
+    idx = 0
+    for ticker in tickers:
+        ticker_to_idx[ticker] = idx
+        idx += 1
+
+    num_tickers = len(tickers)
+    days = (END_DATE - START_DATE).days
+    data_points = days + 1
+
+    raw_data = np.zeros((num_tickers, data_points, 5))
+    raw_dt = np.zeros((data_points))
+    for idx in range(data_points):
+        date = START_DATE + datetime.timedelta(days=idx)
+        # convert date to datetime
+        dt = datetime.datetime.combine(date, datetime.time.min)
+        raw_dt[idx] = dt.timestamp()
+
+    num_lines = sum(1 for line in open(FILE_NAME))
+    line = 0
+    curr_progress = 0
+    with open(FILE_NAME, 'r') as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            line += 1
+
+            progress = line // (num_lines // 10)
+            if progress != curr_progress:
+                print('.', sep=' ', end='', flush=True)
+                curr_progress = progress
+
+            ticker = row[0]
+            if ticker not in ticker_to_idx:
+                continue
+            ticker_idx = ticker_to_idx[ticker]
+            dt = datetime.datetime.strptime(row[1], '%Y-%m-%d').date()
+            if dt < START_DATE or dt > END_DATE:
+                continue
+            dt_idx = (dt - START_DATE).days
+            try:
+                o = float(row[2])
+                c = float(row[3])
+                h = float(row[4])
+                l = float(row[5])
+                v = float(row[6])
+                a_o = float(row[7])
+                a_c = float(row[8])
+                a_h = float(row[9])
+                a_l = float(row[10])
+                # d_c = float(row[11])
+                # s_f = float(row[12])
+
+                if use_adj_px:
+                    raw_data[ticker_idx, dt_idx, 0] = a_o
+                    raw_data[ticker_idx, dt_idx, 1] = a_h
+                    raw_data[ticker_idx, dt_idx, 2] = a_l
+                    raw_data[ticker_idx, dt_idx, 3] = a_c
+                else:
+                    raw_data[ticker_idx, dt_idx, 0] = o
+                    raw_data[ticker_idx, dt_idx, 1] = h
+                    raw_data[ticker_idx, dt_idx, 2] = l
+                    raw_data[ticker_idx, dt_idx, 3] = c
+                raw_data[ticker_idx, dt_idx, 4] = v
+            except:
+                pass
+
+    np_tickers = np.array(tickers, dtype=np.object)
+    print('')
+    print('saving file...')
+    np.savez(DUMP_FILE_NAME, raw_tickers = np_tickers, raw_dt=raw_dt, raw_data=raw_data)
+    print('preprocessing completed!')
 
 def load_npz_data(DUMP_FILE_NAME):
     input = np.load(DUMP_FILE_NAME)
