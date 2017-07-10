@@ -4,6 +4,7 @@ import numpy as np
 
 from enum import Enum
 
+CAP = 80
 
 def filter_tradeable_stocks(raw_data):
     g_a = raw_data[:, :, 4] * raw_data[:, :, 3]
@@ -45,7 +46,7 @@ def get_dates_for_weekly_return(start_date, end_date, traded_stocks, sunday, n_w
         if data_idx is None:
             return None
         for j in range(7):
-            if traded_stocks[data_idx] > 0:
+            if traded_stocks[data_idx] > CAP:
                 dates.append(data_idx)
                 populated += 1
                 break
@@ -63,7 +64,7 @@ def get_dates_for_daily_return(start_date, end_date, traded_stocks, sunday, n_d)
         return None
     populated = 0
     while populated < n_d + 1:
-        if traded_stocks[data_idx] > 0:
+        if traded_stocks[data_idx] > CAP:
             dates.append(data_idx)
             populated += 1
         data_idx -= 1
@@ -73,6 +74,7 @@ def get_dates_for_daily_return(start_date, end_date, traded_stocks, sunday, n_d)
 
 
 def get_date_for_enter_return(start_date, end_date, traded_stocks, monday):
+    cap = 50
     dates = []
     data_idx = get_data_idx(monday, start_date, end_date)
     end_data_idx = get_data_idx(end_date, start_date, end_date)
@@ -80,7 +82,7 @@ def get_date_for_enter_return(start_date, end_date, traded_stocks, monday):
         return None
     populated = 0
     while populated < 1:
-        if traded_stocks[data_idx] > 0:
+        if traded_stocks[data_idx] > CAP:
             dates.append(data_idx)
             populated += 1
         data_idx += 1

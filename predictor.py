@@ -12,28 +12,18 @@ NUM_DAYS = 5
 PERCENTILE = 10
 
 TODAY = datetime.datetime.today().date()
-# default values
-HPR_DATE = TODAY - datetime.timedelta(days=1)
-PREDICTION_DATE = HPR_DATE - datetime.timedelta(days=HPR_DATE.isoweekday() + 2)
-# you can set prediction date(ie friday) and hpr date explicitly
-# PREDICTION_DATE = datetime.datetime.strptime('2017-06-02', '%Y-%m-%d').date()
-# HPR_DATE = datetime.datetime.strptime('2017-06-09', '%Y-%m-%d').date()
-# PREDICTION_DATE = datetime.datetime.strptime('2017-06-09', '%Y-%m-%d').date()
-# HPR_DATE = datetime.datetime.strptime('2017-06-16', '%Y-%m-%d').date()
-# PREDICTION_DATE = datetime.datetime.strptime('2017-06-16', '%Y-%m-%d').date()
-# HPR_DATE = datetime.datetime.strptime('2017-06-23', '%Y-%m-%d').date()
-# PREDICTION_DATE = datetime.datetime.strptime('2017-06-23', '%Y-%m-%d').date()
-# HPR_DATE = datetime.datetime.strptime('2017-06-27', '%Y-%m-%d').date()
+# YYYY-MM-DD
 PREDICTION_DATE = datetime.datetime.strptime('2017-06-30', '%Y-%m-%d').date()
-HPR_DATE = datetime.datetime.strptime('2017-07-03', '%Y-%m-%d').date()
+OPEN_POS_DATE = datetime.datetime.strptime('2017-07-03', '%Y-%m-%d').date()
+HPR_DATE = datetime.datetime.strptime('2017-07-07', '%Y-%m-%d').date()
 
 
 START_DATE = PREDICTION_DATE - datetime.timedelta(days=(NUM_WEEKS + 2) * 7)
 END_DATE = HPR_DATE
 
 tickers, ticker_to_idx, idx_to_ticker = parse_tickers('data/tickers_nasdaq.csv')
-download_data(tickers, 'data/history.csv', START_DATE, END_DATE, 50)
-preprocess_data(ticker_to_idx, 'data/history.csv', START_DATE, END_DATE, 'data/history.npz')
+# download_data(tickers, 'data/history.csv', START_DATE, END_DATE, 50)
+# preprocess_data(ticker_to_idx, 'data/history.csv', START_DATE, END_DATE, 'data/history.npz')
 raw_dt, raw_data = load_npz_data('data/history.npz')
 mask, traded_stocks = filter_tradeable_stocks(raw_data)
 
@@ -61,6 +51,7 @@ ONE_WEEK_RETURN_IDX = w_r_i[NUM_WEEKS - 1]
 ONE_DAY_RETURN_IDX = d_r_i[NUM_DAYS - 1]
 PREDICTION_DATE_IDX = d_r_i[NUM_DAYS]
 HPR_DATE_IDX = get_data_idx(HPR_DATE, START_DATE, END_DATE)
+OPEN_POS_DATE_IDX  = get_data_idx(OPEN_POS_DATE, START_DATE, END_DATE)
 
 
 def get_csv_date_string(idx):
@@ -72,11 +63,13 @@ CSV_ONE_WEEK_DATE = get_csv_date_string(ONE_WEEK_RETURN_IDX)
 CSV_ONE_DAY_DATE = get_csv_date_string(ONE_DAY_RETURN_IDX)
 CSV_PREDICATION_DATE = get_csv_date_string(PREDICTION_DATE_IDX)
 CSV_HPR_DATE = get_csv_date_string(HPR_DATE_IDX)
+CSV_OPEN_POS_DATE = get_csv_date_string(OPEN_POS_DATE_IDX)
+
 
 with open('./data/prediction.csv', 'w', newline='') as f:
     writer = csv.writer(f)
     writer.writerow(
-        ('ticker', 'long prob', 'class', '1w', '1d', '*', 'hp', '1w px', '1d px', '* px', 'hp px', 'hp open px', '1wr pct', '1dr pct',
+        ('ticker', 'long prob', 'class', '1w', '1d', '*', '#', 'hp', '1w px', '1d px', '* px', '# px', 'hp px', '1wr pct', '1dr pct',
          'hpr pct', '1d v', '1w avg v'))
 
     for idx in sorted_indexes:
@@ -93,7 +86,10 @@ with open('./data/prediction.csv', 'w', newline='') as f:
         _1d_px = raw_data[ticker_idx, ONE_DAY_RETURN_IDX, 3]
         _pred_px = raw_data[ticker_idx, PREDICTION_DATE_IDX, 3]
         _hp_px = raw_data[ticker_idx, HPR_DATE_IDX, 3]
-        _hp_open_px = raw_data[ticker_idx, HPR_DATE_IDX, 0]
+
+        _open_px = raw_data[ticker_idx, OPEN_POS_DATE_IDX, 0]
+        if OPEN_POS_DATE <= PREDICTION_DATE:
+            _open_px = raw_data[ticker_idx, OPEN_POS_DATE_IDX, 3]
 
         _week_gross_volume = raw_data[ticker_idx, d_r_i[1:], 3] * raw_data[ticker_idx, d_r_i[1:], 4]
         _last_day_gross_volume = _week_gross_volume[4]
@@ -106,7 +102,7 @@ with open('./data/prediction.csv', 'w', newline='') as f:
 
         _1wr_pct = get_pct(_1w_px, _pred_px)
         _1dr_pct = get_pct(_1d_px, _pred_px)
-        _hpr_pct = get_pct(_pred_px, _hp_px)
+        _hpr_pct = get_pct(_open_px, _hp_px)
 
         writer.writerow((ticker,
                          long_prob,
@@ -114,12 +110,13 @@ with open('./data/prediction.csv', 'w', newline='') as f:
                          CSV_ONE_WEEK_DATE,
                          CSV_ONE_DAY_DATE,
                          CSV_PREDICATION_DATE,
+                         CSV_OPEN_POS_DATE,
                          CSV_HPR_DATE,
                          _1w_px,
                          _1d_px,
                          _pred_px,
+                         _open_px,
                          _hp_px,
-                         _hp_open_px,
                          _1wr_pct,
                          _1dr_pct,
                          _hpr_pct,

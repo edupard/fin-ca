@@ -10,6 +10,7 @@ from download_utils import load_npz_data
 from visualization import wealth_graph, confusion_matrix, hpr_analysis
 from visualization import plot_20_random_stock_prices, plot_traded_stocks_per_day
 from nn import train_ae, train_ffnn, train_rbm, evaluate_ffnn
+from date_range import HIST_BEG, HIST_END
 
 NUM_WEEKS = 12
 NUM_DAYS = 5
@@ -30,11 +31,10 @@ class SelectionAlgo(Enum):
 BET_PCT = 2
 SLCT_PCT = 100
 SLCT_ALG = SelectionAlgo.TOP
-# TOP_N_STOCKS = 2
-# TOP_N_STOCKS = 8
 TOP_N_STOCKS = None
+# TOP_N_STOCKS = 1
 
-raw_dt, raw_data = load_npz_data('data/nasdaq_raw_data.npz')
+raw_dt, raw_data = load_npz_data('data/nasdaq.npz')
 
 raw_mpl_dt = convert_to_mpl_time(raw_dt)
 
@@ -43,15 +43,10 @@ mask, traded_stocks = filter_tradeable_stocks(raw_data)
 # plot_20_random_stock_prices(raw_data, raw_mpl_dt)
 # plot_traded_stocks_per_day(traded_stocks, raw_mpl_dt)
 
-# TRAIN_UP_TO_DATE = datetime.datetime.strptime('2008-01-01', '%Y-%m-%d').date()
-TRAIN_UP_TO_DATE = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
-# TRAIN_UP_TO_DATE = datetime.datetime.strptime('2013-01-01', '%Y-%m-%d').date()
-# TRAIN_UP_TO_DATE = datetime.datetime.strptime('2015-01-01', '%Y-%m-%d').date()
-# TRAIN_UP_TO_DATE = datetime.datetime.strptime('2017-04-18', '%Y-%m-%d').date()
-# TRAIN_UP_TO_DATE = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
-START_DATE = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
-END_DATE = datetime.datetime.strptime('2017-04-18', '%Y-%m-%d').date()
-SUNDAY = START_DATE + datetime.timedelta(days=7 - START_DATE.isoweekday())
+TRAIN_BEG = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
+TRAIN_END = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
+# TRAIN_END = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
+SUNDAY = TRAIN_BEG + datetime.timedelta(days=7 - HIST_BEG.isoweekday())
 
 train_records = 0
 train_weeks = 0
@@ -87,19 +82,19 @@ while True:
     # iterate over weeks
     SUNDAY = SUNDAY + datetime.timedelta(days=7)
     # break when all availiable data processed
-    if SUNDAY > END_DATE:
+    if SUNDAY > HIST_END:
         break
-    w_r_i = get_dates_for_weekly_return(START_DATE, END_DATE, traded_stocks, SUNDAY, NUM_WEEKS + 1)
+    w_r_i = get_dates_for_weekly_return(HIST_BEG, HIST_END, traded_stocks, SUNDAY, NUM_WEEKS + 1)
     # continue if all data not availiable yet
     if w_r_i is None:
         continue
-    d_r_i = get_dates_for_daily_return(START_DATE, END_DATE, traded_stocks, SUNDAY - datetime.timedelta(days=7),
+    d_r_i = get_dates_for_daily_return(HIST_BEG, HIST_END, traded_stocks, SUNDAY - datetime.timedelta(days=7),
                                        NUM_DAYS)
     # continue if all data not availiable yet
     if d_r_i is None:
         continue
     if ENT_ON_MON:
-        ent_r_i = get_date_for_enter_return(START_DATE, END_DATE, traded_stocks,
+        ent_r_i = get_date_for_enter_return(HIST_BEG, HIST_END, traded_stocks,
                                             SUNDAY - datetime.timedelta(days=7) + datetime.timedelta(days=1))
         if ent_r_i is None:
             continue
@@ -107,7 +102,7 @@ while True:
         ent_r_i = d_r_i[-1:]
 
     if EXIT_ON_MON:
-        ext_r_i = get_date_for_enter_return(START_DATE, END_DATE, traded_stocks,
+        ext_r_i = get_date_for_enter_return(HIST_BEG, HIST_END, traded_stocks,
                                             SUNDAY + datetime.timedelta(days=1))
         if ext_r_i is None:
             continue
@@ -131,30 +126,29 @@ while True:
     # calc daily returns
     d_n_r = calc_z_score(d_c)
     w_n_r = calc_z_score(w_c[:, :-1])
-    dr = append_data(dr, d_n_r)
-    wr = append_data(wr, w_n_r)
 
     _hpr = (w_c[:, NUM_WEEKS + 1] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
-    hpr = append_data(hpr, _hpr)
     _hpr_model = (ext_px[:, 0] - ent_px[:, 0]) / ent_px[:, 0]
-    hpr_model = append_data(hpr_model, _hpr_model)
     _int_r = (ent_px[:, 0] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
-    int_r = append_data(int_r, _int_r)
 
     hpr_med = np.median(_hpr)
     _c_l = _hpr >= hpr_med
     _c_s = ~_c_l
-    c_l = append_data(c_l, _c_l)
-    c_s = append_data(c_s, _c_s)
 
     enter_date_idx = w_r_i[NUM_WEEKS]
     exit_date_idx = w_r_i[NUM_WEEKS + 1]
 
-    stocks = append_data(stocks, t_s_i)
-
     # sample size
     num_stocks = t_s_i.shape[0]
 
+    stocks = append_data(stocks, t_s_i)
+    dr = append_data(dr, d_n_r)
+    wr = append_data(wr, w_n_r)
+    hpr = append_data(hpr, _hpr)
+    hpr_model = append_data(hpr_model, _hpr_model)
+    int_r = append_data(int_r, _int_r)
+    c_l = append_data(c_l, _c_l)
+    c_s = append_data(c_s, _c_s)
     w_data_index = append_data(w_data_index, make_array(data_set_records))
     w_num_stocks = append_data(w_num_stocks, make_array(num_stocks))
     w_enter_index = append_data(w_enter_index, make_array(enter_date_idx))
@@ -163,7 +157,7 @@ while True:
     # record counts
     data_set_records += num_stocks
     total_weeks += 1
-    if SUNDAY <= TRAIN_UP_TO_DATE:
+    if SUNDAY <= TRAIN_END:
         train_records += num_stocks
         train_weeks += 1
 
@@ -259,6 +253,10 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         # l_hpr = _hpr_model[_s_s_l]
         # s_hpr = _hpr_model[_s_s_s]
 
+        print(top_bound)
+        print(bottom_bound)
+        print(l_hpr)
+        print(s_hpr)
         top_hpr[w_i] = np.mean(l_hpr)
         bottom_hpr[w_i] = np.mean(s_hpr)
         top_stocks_num[w_i] = l_hpr.shape[0]
