@@ -37,15 +37,15 @@ def get_data_idx(dt, start_date, end_date):
     return (dt - start_date).days
 
 
-def get_dates_for_weekly_return(start_date, end_date, traded_stocks, sunday, n_w):
+def get_dates_for_weekly_return(start_date, end_date, traded_stocks, date, n_w):
     dates = []
-    t_d = sunday
+    t_d = date
     populated = 0
     while populated < n_w + 1:
         data_idx = get_data_idx(t_d, start_date, end_date)
         if data_idx is None:
             return None
-        for j in range(7):
+        for j in range(date.isoweekday()):
             if traded_stocks[data_idx] > CAP:
                 dates.append(data_idx)
                 populated += 1
@@ -53,13 +53,13 @@ def get_dates_for_weekly_return(start_date, end_date, traded_stocks, sunday, n_w
             data_idx -= 1
             if data_idx < 0:
                 return None
-        t_d = t_d - datetime.timedelta(days=7)
+        t_d = t_d - datetime.timedelta(days=7) + datetime.timedelta(days = (7-t_d.isoweekday()))
     return dates[::-1]
 
 
-def get_dates_for_daily_return(start_date, end_date, traded_stocks, sunday, n_d):
+def get_dates_for_daily_return(start_date, end_date, traded_stocks, date, n_d):
     dates = []
-    data_idx = get_data_idx(sunday, start_date, end_date)
+    data_idx = get_data_idx(date, start_date, end_date)
     if data_idx is None:
         return None
     populated = 0
@@ -73,10 +73,9 @@ def get_dates_for_daily_return(start_date, end_date, traded_stocks, sunday, n_d)
     return dates[::-1]
 
 
-def get_date_for_enter_return(start_date, end_date, traded_stocks, monday):
-    cap = 50
+def get_one_trading_date(start_date, end_date, traded_stocks, date):
     dates = []
-    data_idx = get_data_idx(monday, start_date, end_date)
+    data_idx = get_data_idx(date, start_date, end_date)
     end_data_idx = get_data_idx(end_date, start_date, end_date)
     if data_idx is None:
         return None

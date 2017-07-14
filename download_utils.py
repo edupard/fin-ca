@@ -255,6 +255,12 @@ def load_npz_data(DUMP_FILE_NAME):
     raw_data = input['raw_data']
     return  raw_dt, raw_data
 
+def load_npz_data_alt(DUMP_FILE_NAME):
+    input = np.load(DUMP_FILE_NAME)
+    raw_tickers = input['raw_tickers']
+    raw_dt = input['raw_dt']
+    raw_data = input['raw_data']
+    return raw_tickers, raw_dt, raw_data
 
 
 

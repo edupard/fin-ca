@@ -2,12 +2,14 @@ import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 from enum import Enum
+import csv
 
+from tickers import get_nyse_nasdaq_tickers, get_nyse_tickers, get_nasdaq_tickers
 from data_utils import filter_tradeable_stocks, convert_to_mpl_time, get_dates_for_daily_return, \
-    get_date_for_enter_return, get_dates_for_weekly_return, get_tradeable_stock_indexes, get_prices, \
+    get_one_trading_date, get_dates_for_weekly_return, get_tradeable_stock_indexes, get_prices, \
     PxType, calc_z_score
-from download_utils import load_npz_data
-from visualization import wealth_graph, confusion_matrix, hpr_analysis
+from download_utils import load_npz_data, load_npz_data_alt
+from visualization import wealth_graph, confusion_matrix, hpr_analysis, wealth_csv
 from visualization import plot_20_random_stock_prices, plot_traded_stocks_per_day
 from nn import train_ae, train_ffnn, train_rbm, evaluate_ffnn
 from date_range import HIST_BEG, HIST_END
@@ -34,7 +36,7 @@ SLCT_ALG = SelectionAlgo.TOP
 TOP_N_STOCKS = None
 # TOP_N_STOCKS = 1
 
-raw_dt, raw_data = load_npz_data('data/nasdaq.npz')
+tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq_adj.npz')
 
 raw_mpl_dt = convert_to_mpl_time(raw_dt)
 
@@ -46,7 +48,7 @@ mask, traded_stocks = filter_tradeable_stocks(raw_data)
 TRAIN_BEG = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
 TRAIN_END = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
 # TRAIN_END = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
-SUNDAY = TRAIN_BEG + datetime.timedelta(days=7 - HIST_BEG.isoweekday())
+SUNDAY = TRAIN_BEG + datetime.timedelta(days=7 - TRAIN_BEG.isoweekday())
 
 train_records = 0
 train_weeks = 0
@@ -81,6 +83,9 @@ def make_array(value):
 while True:
     # iterate over weeks
     SUNDAY = SUNDAY + datetime.timedelta(days=7)
+    # TODO: remove this line - temp workaround to print last date due to HIST_END error
+    if SUNDAY == datetime.datetime.strptime('2017-07-09', '%Y-%m-%d').date():
+        SUNDAY = datetime.datetime.strptime('2017-07-07', '%Y-%m-%d').date()
     # break when all availiable data processed
     if SUNDAY > HIST_END:
         break
@@ -94,25 +99,50 @@ while True:
     if d_r_i is None:
         continue
     if ENT_ON_MON:
-        ent_r_i = get_date_for_enter_return(HIST_BEG, HIST_END, traded_stocks,
-                                            SUNDAY - datetime.timedelta(days=7) + datetime.timedelta(days=1))
+        ent_r_i = get_one_trading_date(HIST_BEG, HIST_END, traded_stocks,
+                                       SUNDAY - datetime.timedelta(days=7) + datetime.timedelta(days=1))
         if ent_r_i is None:
             continue
     else:
         ent_r_i = d_r_i[-1:]
 
     if EXIT_ON_MON:
-        ext_r_i = get_date_for_enter_return(HIST_BEG, HIST_END, traded_stocks,
-                                            SUNDAY + datetime.timedelta(days=1))
+        ext_r_i = get_one_trading_date(HIST_BEG, HIST_END, traded_stocks,
+                                       SUNDAY + datetime.timedelta(days=1))
         if ext_r_i is None:
             continue
     else:
         ext_r_i = w_r_i[-1:]
 
-    # t_s_i = get_tradeable_stock_indexes(mask, w_r_i + d_r_i)
+    # t_s_i = get_tradeable_stock_indexes(mask, w_r_i[:-1] + d_r_i)
     t_s_i = get_tradeable_stock_indexes(mask, w_r_i + d_r_i + ent_r_i + ext_r_i)
     d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE)
     w_c = get_prices(raw_data, t_s_i, w_r_i, PxType.CLOSE)
+
+    # exit_date = datetime.datetime.fromtimestamp(raw_dt[ext_r_i[0]]).date()
+    # if exit_date == datetime.datetime.strptime('2017-07-07', '%Y-%m-%d').date():
+    #     with open('data/test_analyze.csv', 'w', newline='') as f:
+    #         writer = csv.writer(f)
+    #         row = ['ticker']
+    #         for dt_idx in w_r_i[:-1]:
+    #             dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
+    #             row.append(dt.strftime('%Y-%m-%d'))
+    #         for dt_idx in d_r_i:
+    #             dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
+    #             row.append(dt.strftime('%Y-%m-%d'))
+    #         writer.writerow(row)
+    #
+    #         idx = 0
+    #         for ticker_idx in t_s_i:
+    #             ticker = tickers[ticker_idx]
+    #             row = []
+    #             row.append(ticker)
+    #             for v in w_c[idx, :-1]:
+    #                 row.append(v)
+    #             for v in d_c[idx, :]:
+    #                 row.append(v)
+    #             writer.writerow(row)
+    #             idx += 1
 
     px_type = PxType.CLOSE
     if ENT_ON_MON and ENT_MON_OPEN:
@@ -180,6 +210,8 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
     bottom_hpr = np.zeros((total_weeks))
     top_stocks_num = np.zeros((total_weeks))
     bottom_stocks_num = np.zeros((total_weeks))
+    l_port = np.empty((total_weeks), dtype=np.object)
+    s_port = np.empty((total_weeks), dtype=np.object)
 
     for i in range(total_weeks):
         w_i = i
@@ -253,18 +285,42 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         # l_hpr = _hpr_model[_s_s_l]
         # s_hpr = _hpr_model[_s_s_s]
 
-        print(top_bound)
-        print(bottom_bound)
-        print(l_hpr)
-        print(s_hpr)
+
+        _stocks = stocks[beg:end]
+        _l_stocks = _stocks[sel_l_cond]
+        _s_stocks = _stocks[sel_s_cond]
+        s_longs = ""
+        s_shorts = ""
+        idx = 0
+        for _stock_idx in _l_stocks:
+            if s_longs != "":
+                s_longs += " "
+            s_longs += tickers[_stock_idx]
+            s_longs += " "
+            s_longs += str(l_hpr[idx])
+            idx += 1
+        idx = 0
+        for _stock_idx in _s_stocks:
+            if s_shorts != "":
+                s_shorts += " "
+            s_shorts += tickers[_stock_idx]
+            s_shorts += " "
+            s_shorts += str(s_hpr[idx])
+            idx += 1
+
+        # print(s_longs)
+        # print(s_shorts)
+        l_port[w_i] = s_longs
+        s_port[w_i] = s_shorts
         top_hpr[w_i] = np.mean(l_hpr)
         bottom_hpr[w_i] = np.mean(s_hpr)
         top_stocks_num[w_i] = l_hpr.shape[0]
         bottom_stocks_num[w_i] = s_hpr.shape[0]
-    return c_l, c_s, top_hpr, bottom_hpr, top_stocks_num, bottom_stocks_num
+
+    return c_l, c_s, top_hpr, bottom_hpr, top_stocks_num, bottom_stocks_num, l_port, s_port
 
 
-# s_c_l, s_c_s, t_hpr, b_hpr, t_stocks, b_stocks = calc_classes_and_decisions(
+# s_c_l, s_c_s, t_hpr, b_hpr, t_stocks, b_stocks, l_port, s_port = calc_classes_and_decisions(
 #     data_set_records, total_weeks, wr[:, NUM_WEEKS - 1]
 # )
 
@@ -272,7 +328,7 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
 # hpr_analysis(t_hpr, b_hpr)
 # wealth_graph(t_hpr, b_hpr, w_exit_index, raw_mpl_dt, raw_dt)
 
-e_c_l, e_c_s, t_e_hpr, b_e_hpr, t_e_stocks, b_e_stocks = calc_classes_and_decisions(
+e_c_l, e_c_s, t_e_hpr, b_e_hpr, t_e_stocks, b_e_stocks, l_port, s_port = calc_classes_and_decisions(
     data_set_records, total_weeks, prob_l
 )
 
@@ -284,5 +340,13 @@ wealth_graph(t_e_hpr[train_weeks:],
              w_exit_index[train_weeks:],
              raw_mpl_dt,
              raw_dt)
+wealth_csv(t_e_hpr[train_weeks:],
+           b_e_hpr[train_weeks:],
+           w_enter_index[train_weeks:],
+           w_exit_index[train_weeks:],
+           raw_dt,
+           l_port[train_weeks:],
+           s_port[train_weeks:]
+           )
 
 plt.show(True)

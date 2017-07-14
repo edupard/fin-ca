@@ -242,16 +242,15 @@ def wealth_graph(t_hpr, b_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
         rc_dd
     ))
 
-    # fig = plt.figure()
-    # ax = fig.add_subplot(1, 1, 1)
-    # draw_grid(ax)
-    # format_time_labels(ax, fmt=YYYY_FMT)
-    # ax.bar(yts, yr_alt, color='b', width=100)
-    # ax.xaxis_date()
-    # ax.set_title("Year pct return alt")
 
-    # with open('./data/pl.csv', 'w', newline='') as f:
-    with open('./data/weekly_pl.csv', 'w', newline='') as f:
+def wealth_csv(t_hpr, b_hpr, w_enter_index, w_exit_index, raw_dt, l_port, s_port):
+    diff = (t_hpr - b_hpr) / 2
+
+    progress = diff
+    wealth = np.cumsum(progress) + 1.0
+
+
+    with open('./data/weekly.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         for w in range(wealth.shape[0]):
             dt_enter = datetime.datetime.fromtimestamp(raw_dt[w_enter_index[w]])
@@ -259,8 +258,4 @@ def wealth_graph(t_hpr, b_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
             _t_hpr = t_hpr[w]
             _b_hpr = b_hpr[w]
             writer.writerow(
-                (dt_enter.strftime('%Y-%m-%d'), dt_exit.strftime('%Y-%m-%d'), _t_hpr, _b_hpr, (_t_hpr - _b_hpr) / 2))
-
-            # _wealth = wealth[w]
-            # _rc_wealth = rc_wealth[w]
-            # writer.writerow((dt_exit.strftime('%Y-%m-%d'), _wealth, _rc_wealth))
+                (dt_enter.strftime('%Y-%m-%d'), dt_exit.strftime('%Y-%m-%d'), _t_hpr, _b_hpr, (_t_hpr - _b_hpr) / 2, l_port[w], s_port[w]))
