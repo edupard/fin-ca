@@ -5,9 +5,9 @@ from enum import Enum
 import csv
 
 from tickers import get_nyse_nasdaq_tickers, get_nyse_tickers, get_nasdaq_tickers
-from data_utils import filter_tradeable_stocks, convert_to_mpl_time, get_dates_for_daily_return, \
-    get_one_trading_date, get_dates_for_weekly_return, get_tradeable_stock_indexes, get_prices, \
-    PxType, calc_z_score
+from data_utils import filter_activelly_tradeable_stocks, convert_to_mpl_time, get_dates_for_daily_return, \
+    get_one_trading_date, get_dates_for_weekly_return, get_tradable_stock_indexes, get_prices, \
+    PxType, calc_z_score, get_tradable_stocks_mask
 from download_utils import load_npz_data, load_npz_data_alt
 from visualization import wealth_graph, confusion_matrix, hpr_analysis, wealth_csv
 from visualization import plot_20_random_stock_prices, plot_traded_stocks_per_day
@@ -21,6 +21,8 @@ ENT_ON_MON = True
 ENT_MON_OPEN = True
 EXIT_ON_MON = False
 EXIT_ON_MON_OPEN = True
+
+STOP_LOSS_HPR = -0.90
 
 
 class SelectionAlgo(Enum):
@@ -40,14 +42,17 @@ tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq_adj.npz')
 
 raw_mpl_dt = convert_to_mpl_time(raw_dt)
 
-mask, traded_stocks = filter_tradeable_stocks(raw_data)
+mask, traded_stocks = filter_activelly_tradeable_stocks(raw_data)
+tradable_mask = get_tradable_stocks_mask(raw_data)
 
 # plot_20_random_stock_prices(raw_data, raw_mpl_dt)
 # plot_traded_stocks_per_day(traded_stocks, raw_mpl_dt)
 
 TRAIN_BEG = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
-TRAIN_END = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
-# TRAIN_END = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
+# TRAIN_END = HIST_END
+# TRAIN_END = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
+# TRAIN_END = datetime.datetime.strptime('2015-01-01', '%Y-%m-%d').date()
+TRAIN_END = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
 SUNDAY = TRAIN_BEG + datetime.timedelta(days=7 - TRAIN_BEG.isoweekday())
 
 train_records = 0
@@ -114,8 +119,12 @@ while True:
     else:
         ext_r_i = w_r_i[-1:]
 
-    # t_s_i = get_tradeable_stock_indexes(mask, w_r_i[:-1] + d_r_i)
-    t_s_i = get_tradeable_stock_indexes(mask, w_r_i + d_r_i + ent_r_i + ext_r_i)
+
+    # t_s_i = get_tradable_stock_indexes(mask, w_r_i + d_r_i + ent_r_i + ext_r_i)
+    t_s_i = get_tradable_stock_indexes(mask, w_r_i[:-1] + d_r_i)
+    t_s_i_e_e = get_tradable_stock_indexes(tradable_mask, w_r_i[-1:] + ent_r_i + ext_r_i)
+    t_s_i = np.intersect1d(t_s_i, t_s_i_e_e)
+
     d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE)
     w_c = get_prices(raw_data, t_s_i, w_r_i, PxType.CLOSE)
 
@@ -339,14 +348,15 @@ wealth_graph(t_e_hpr[train_weeks:],
              w_enter_index[train_weeks:],
              w_exit_index[train_weeks:],
              raw_mpl_dt,
-             raw_dt)
+             raw_dt,
+             STOP_LOSS_HPR)
 wealth_csv(t_e_hpr[train_weeks:],
            b_e_hpr[train_weeks:],
            w_enter_index[train_weeks:],
            w_exit_index[train_weeks:],
            raw_dt,
            l_port[train_weeks:],
-           s_port[train_weeks:]
-           )
+           s_port[train_weeks:],
+           STOP_LOSS_HPR)
 
 plt.show(True)

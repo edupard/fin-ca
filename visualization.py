@@ -103,7 +103,7 @@ def confusion_matrix(a_l, a_s, p_l, p_s):
     ))
 
 
-def wealth_graph(t_hpr, b_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
+def wealth_graph(t_hpr, b_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt, STOP_LOSS_HPR):
     def format_time_labels(ax, fmt):
         ax.xaxis.set_major_formatter(fmt)
         for label in ax.xaxis.get_ticklabels():
@@ -140,6 +140,7 @@ def wealth_graph(t_hpr, b_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
     fig = plt.figure()
 
     diff = (t_hpr - b_hpr) / 2
+    diff = np.maximum(diff, STOP_LOSS_HPR)
 
     progress = diff
     # wealth = np.cumsum(progress)
@@ -243,8 +244,9 @@ def wealth_graph(t_hpr, b_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
     ))
 
 
-def wealth_csv(t_hpr, b_hpr, w_enter_index, w_exit_index, raw_dt, l_port, s_port):
+def wealth_csv(t_hpr, b_hpr, w_enter_index, w_exit_index, raw_dt, l_port, s_port, STOP_LOSS_HPR):
     diff = (t_hpr - b_hpr) / 2
+    diff = np.maximum(diff, STOP_LOSS_HPR)
 
     progress = diff
     wealth = np.cumsum(progress) + 1.0

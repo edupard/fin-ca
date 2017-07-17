@@ -4,9 +4,13 @@ import numpy as np
 
 from enum import Enum
 
-CAP = 80
+CAP = 50
 
-def filter_tradeable_stocks(raw_data):
+def get_tradable_stocks_mask(raw_data):
+    mask = raw_data[:, :, 3] > 0.0
+    return mask
+
+def filter_activelly_tradeable_stocks(raw_data):
     g_a = raw_data[:, :, 4] * raw_data[:, :, 3]
     mask = g_a[:, :] > 10000000
     # alternative tradable stock selection algos
@@ -90,7 +94,7 @@ def get_one_trading_date(start_date, end_date, traded_stocks, date):
     return dates[::-1]
 
 
-def get_tradeable_stock_indexes(mask, r_i):
+def get_tradable_stock_indexes(mask, r_i):
     # stocks slice on days used to calculate returns
     s_s = mask[:, r_i]
     # tradable stocks slice

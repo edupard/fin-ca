@@ -2,7 +2,7 @@ from pandas import read_csv
 
 
 def get_supported_tickers():
-    return read_csv('data/supported_tickers.csv')
+    return read_csv('data/supported_tickers_corrected.csv')
 
 
 def filter_nasdaq_tickers(t_df):
