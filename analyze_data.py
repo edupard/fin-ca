@@ -7,7 +7,7 @@ import csv
 from tickers import get_nyse_nasdaq_tickers, get_nyse_tickers, get_nasdaq_tickers
 from data_utils import filter_activelly_tradeable_stocks, convert_to_mpl_time, get_dates_for_daily_return, \
     get_one_trading_date, get_dates_for_weekly_return, get_tradable_stock_indexes, get_prices, \
-    PxType, calc_z_score, get_tradable_stocks_mask
+    PxType, calc_z_score, get_tradable_stocks_mask, get_intermediate_dates
 from download_utils import load_npz_data, load_npz_data_alt
 from visualization import wealth_graph, confusion_matrix, hpr_analysis, wealth_csv
 from visualization import plot_20_random_stock_prices, plot_traded_stocks_per_day
@@ -62,6 +62,7 @@ data_set_records = 0
 
 dr = None
 wr = None
+t_w_hpr = None
 hpr = None
 hpr_model = None
 int_r = None
@@ -72,6 +73,20 @@ w_data_index = None
 w_num_stocks = None
 w_enter_index = None
 w_exit_index = None
+
+
+def append_data_and_pad_with_zeros(data, _data):
+    if data is None:
+        return _data
+    else:
+        d_l = data.shape[1]
+        s_l = _data.shape[1]
+        if d_l > s_l:
+            _data = np.pad(_data, ((0, 0), (0, d_l - s_l)), mode='constant', constant_values=0.0)
+        elif s_l > d_l:
+            data = np.pad(data, ((0, 0), (0, s_l - d_l)), mode='constant', constant_values=0.0)
+
+        return np.concatenate([data, _data], axis=0)
 
 
 def append_data(data, _data):
@@ -88,9 +103,6 @@ def make_array(value):
 while True:
     # iterate over weeks
     SUNDAY = SUNDAY + datetime.timedelta(days=7)
-    # TODO: remove this line - temp workaround to print last date due to HIST_END error
-    if SUNDAY == datetime.datetime.strptime('2017-07-09', '%Y-%m-%d').date():
-        SUNDAY = datetime.datetime.strptime('2017-07-07', '%Y-%m-%d').date()
     # break when all availiable data processed
     if SUNDAY > HIST_END:
         break
@@ -119,10 +131,11 @@ while True:
     else:
         ext_r_i = w_r_i[-1:]
 
+    tw_r_i = get_intermediate_dates(HIST_BEG, HIST_END, traded_stocks, ent_r_i, ext_r_i)
 
     # t_s_i = get_tradable_stock_indexes(mask, w_r_i + d_r_i + ent_r_i + ext_r_i)
     t_s_i = get_tradable_stock_indexes(mask, w_r_i[:-1] + d_r_i)
-    t_s_i_e_e = get_tradable_stock_indexes(tradable_mask, w_r_i[-1:] + ent_r_i + ext_r_i)
+    t_s_i_e_e = get_tradable_stock_indexes(tradable_mask, w_r_i[-1:] + ent_r_i + ext_r_i + tw_r_i)
     t_s_i = np.intersect1d(t_s_i, t_s_i_e_e)
 
     d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE)
@@ -168,6 +181,10 @@ while True:
 
     _hpr = (w_c[:, NUM_WEEKS + 1] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
     _hpr_model = (ext_px[:, 0] - ent_px[:, 0]) / ent_px[:, 0]
+
+    tw_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.CLOSE)
+    _t_w_hpr = ((tw_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
+
     _int_r = (ent_px[:, 0] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
 
     hpr_med = np.median(_hpr)
@@ -183,6 +200,7 @@ while True:
     stocks = append_data(stocks, t_s_i)
     dr = append_data(dr, d_n_r)
     wr = append_data(wr, w_n_r)
+    t_w_hpr = append_data_and_pad_with_zeros(t_w_hpr, _t_w_hpr)
     hpr = append_data(hpr, _hpr)
     hpr_model = append_data(hpr_model, _hpr_model)
     int_r = append_data(int_r, _int_r)
@@ -323,6 +341,15 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         s_port[w_i] = s_shorts
         top_hpr[w_i] = np.mean(l_hpr)
         bottom_hpr[w_i] = np.mean(s_hpr)
+
+        _t_w_hpr = t_w_hpr[beg: end,:]
+        _t_w_l_hpr = _t_w_hpr[sel_l_cond,:]
+        _t_w_s_hpr = _t_w_hpr[sel_s_cond,:]
+        _t_w_l_hpr_mean = np.mean(_t_w_l_hpr, axis=0)
+        _t_w_s_hpr_mean = np.mean(_t_w_s_hpr, axis=0)
+        _t_w_diff_hpr = (_t_w_l_hpr_mean - _t_w_s_hpr_mean) / 2.0
+        _t_w_diff_hpr = np.min(_t_w_diff_hpr)
+
         top_stocks_num[w_i] = l_hpr.shape[0]
         bottom_stocks_num[w_i] = s_hpr.shape[0]
 

@@ -93,6 +93,14 @@ def get_one_trading_date(start_date, end_date, traded_stocks, date):
             return None
     return dates[::-1]
 
+def get_intermediate_dates(start_date, end_date, traded_stocks, ent_r_i, ext_r_i):
+    dates = []
+    data_idx = ent_r_i[0] + 1
+    while data_idx <= ext_r_i[0]:
+        if traded_stocks[data_idx] > CAP:
+            dates.append(data_idx)
+        data_idx += 1
+    return dates
 
 def get_tradable_stock_indexes(mask, r_i):
     # stocks slice on days used to calculate returns
@@ -134,3 +142,16 @@ def calc_z_score(c):
     # calc z score
     z_score = (c_r - r_m) / r_std
     return z_score
+
+def calc_z_score_alt(c):
+    # calc returns
+    r = (c[:, 1:] - c[:, :-1]) / c[:, :-1]
+    # accumulate returns
+    c_r = np.cumsum(r, axis=1)
+    # calculate accumulated return mean
+    r_m = np.average(c_r, axis=0)
+    # calculate accumulated return std
+    r_std = np.std(c_r, axis=0)
+    # calc z score
+    z_score = (c_r - r_m) / r_std
+    return z_score, r, c_r, r_m, r_std
