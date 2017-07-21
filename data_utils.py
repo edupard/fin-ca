@@ -114,12 +114,16 @@ def get_tradable_stock_indexes(mask, r_i):
 
 class PxType(Enum):
     OPEN = 0
-    CLOSE = 1
+    HIGH = 1
+    LOW = 2
+    CLOSE = 3
 
 
 def get_prices(raw_data, t_s_i, r_i, px_type: PxType):
     type_to_idx = {
         PxType.OPEN: 0,
+        PxType.HIGH: 1,
+        PxType.LOW: 2,
         PxType.CLOSE: 3
     }
 

@@ -17,12 +17,12 @@ from date_range import HIST_BEG, HIST_END
 NUM_WEEKS = 12
 NUM_DAYS = 5
 
-ENT_ON_MON = True
+ENT_ON_MON = False
 ENT_MON_OPEN = True
 EXIT_ON_MON = False
 EXIT_ON_MON_OPEN = True
 
-STOP_LOSS_HPR = -0.90
+STOP_LOSS_HPR = -0.05
 
 
 class SelectionAlgo(Enum):
@@ -62,10 +62,12 @@ data_set_records = 0
 
 dr = None
 wr = None
-t_w_hpr = None
-hpr = None
-hpr_model = None
-int_r = None
+t_w_s_hpr = None
+t_w_s_h_hpr = None
+t_w_s_l_hpr = None
+s_hpr = None
+s_hpr_model = None
+s_int_r = None
 c_l = None
 c_s = None
 stocks = None
@@ -179,16 +181,22 @@ while True:
     d_n_r = calc_z_score(d_c)
     w_n_r = calc_z_score(w_c[:, :-1])
 
-    _hpr = (w_c[:, NUM_WEEKS + 1] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
-    _hpr_model = (ext_px[:, 0] - ent_px[:, 0]) / ent_px[:, 0]
+    _s_hpr = (w_c[:, NUM_WEEKS + 1] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
+    _s_hpr_model = (ext_px[:, 0] - ent_px[:, 0]) / ent_px[:, 0]
 
-    tw_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.CLOSE)
-    _t_w_hpr = ((tw_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
+    tw_s_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.CLOSE)
+    _t_w_s_hpr = ((tw_s_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
 
-    _int_r = (ent_px[:, 0] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
+    tw_s_h_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.HIGH)
+    _t_w_s_h_hpr = ((tw_s_h_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
 
-    hpr_med = np.median(_hpr)
-    _c_l = _hpr >= hpr_med
+    tw_s_l_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.LOW)
+    _t_w_s_l_hpr = ((tw_s_l_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
+
+    _s_int_r = (ent_px[:, 0] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
+
+    hpr_med = np.median(_s_hpr)
+    _c_l = _s_hpr >= hpr_med
     _c_s = ~_c_l
 
     enter_date_idx = w_r_i[NUM_WEEKS]
@@ -200,10 +208,12 @@ while True:
     stocks = append_data(stocks, t_s_i)
     dr = append_data(dr, d_n_r)
     wr = append_data(wr, w_n_r)
-    t_w_hpr = append_data_and_pad_with_zeros(t_w_hpr, _t_w_hpr)
-    hpr = append_data(hpr, _hpr)
-    hpr_model = append_data(hpr_model, _hpr_model)
-    int_r = append_data(int_r, _int_r)
+    t_w_s_hpr = append_data_and_pad_with_zeros(t_w_s_hpr, _t_w_s_hpr)
+    t_w_s_h_hpr = append_data_and_pad_with_zeros(t_w_s_h_hpr, _t_w_s_h_hpr)
+    t_w_s_l_hpr = append_data_and_pad_with_zeros(t_w_s_l_hpr, _t_w_s_l_hpr)
+    s_hpr = append_data(s_hpr, _s_hpr)
+    s_hpr_model = append_data(s_hpr_model, _s_hpr_model)
+    s_int_r = append_data(s_int_r, _s_int_r)
     c_l = append_data(c_l, _c_l)
     c_s = append_data(c_s, _c_s)
     w_data_index = append_data(w_data_index, make_array(data_set_records))
@@ -235,8 +245,15 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
 
     top_hpr = np.zeros((total_weeks))
     bottom_hpr = np.zeros((total_weeks))
-    top_stocks_num = np.zeros((total_weeks))
-    bottom_stocks_num = np.zeros((total_weeks))
+    model_hpr = np.zeros((total_weeks))
+
+    model_no_sl_hpr = np.zeros((total_weeks))
+    model_eod_sl_hpr = np.zeros((total_weeks))
+    model_lb_sl_hpr = np.zeros((total_weeks))
+    model_s_sl_hpr = np.zeros((total_weeks))
+
+    min_w_eod_hpr = np.zeros((total_weeks))
+    min_w_lb_hpr = np.zeros((total_weeks))
     l_port = np.empty((total_weeks), dtype=np.object)
     s_port = np.empty((total_weeks), dtype=np.object)
 
@@ -268,34 +285,31 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         short_cond = _prob_l <= bottom_bound
         _s_s_l |= long_cond
         _s_s_s |= short_cond
-        # _hpr = hpr[beg: end]
-        # l_hpr = _hpr[_s_s_l]
-        # s_hpr = _hpr[_s_s_s]
-        _int_r = int_r[beg:end]
-        l_int_r = _int_r[_s_s_l]
-        s_int_r = _int_r[_s_s_s]
-        l_int_r_sorted = np.sort(l_int_r)
-        s_int_r_sorted = np.sort(s_int_r)
+        _int_r = s_int_r[beg:end]
+        l_s_int_r = _int_r[_s_s_l]
+        s_s_int_r = _int_r[_s_s_s]
+        l_s_int_r_sorted = np.sort(l_s_int_r)
+        s_s_int_r_sorted = np.sort(s_s_int_r)
 
         if SLCT_ALG == SelectionAlgo.TOP:
-            l_int_r_t_b = np.max(l_int_r)
-            l_int_r_b_b = np.percentile(l_int_r, 100 - SLCT_PCT)
+            l_int_r_t_b = np.max(l_s_int_r)
+            l_int_r_b_b = np.percentile(l_s_int_r, 100 - SLCT_PCT)
         elif SLCT_ALG == SelectionAlgo.BOTTOM:
-            l_int_r_t_b = np.percentile(l_int_r, SLCT_PCT)
-            l_int_r_b_b = np.min(l_int_r)
+            l_int_r_t_b = np.percentile(l_s_int_r, SLCT_PCT)
+            l_int_r_b_b = np.min(l_s_int_r)
         elif SLCT_ALG == SelectionAlgo.MIDDLE:
-            l_int_r_t_b = np.percentile(l_int_r, 100 - SLCT_PCT / 2)
-            l_int_r_b_b = np.percentile(l_int_r, SLCT_PCT / 2)
+            l_int_r_t_b = np.percentile(l_s_int_r, 100 - SLCT_PCT / 2)
+            l_int_r_b_b = np.percentile(l_s_int_r, SLCT_PCT / 2)
 
         if SLCT_ALG == SelectionAlgo.TOP:
-            s_int_r_t_b = np.percentile(s_int_r, SLCT_PCT)
-            s_int_r_b_b = np.min(s_int_r)
+            s_int_r_t_b = np.percentile(s_s_int_r, SLCT_PCT)
+            s_int_r_b_b = np.min(s_s_int_r)
         elif SLCT_ALG == SelectionAlgo.BOTTOM:
-            s_int_r_t_b = np.max(s_int_r)
-            s_int_r_b_b = np.percentile(s_int_r, 100 - SLCT_PCT)
+            s_int_r_t_b = np.max(s_s_int_r)
+            s_int_r_b_b = np.percentile(s_s_int_r, 100 - SLCT_PCT)
         elif SLCT_ALG == SelectionAlgo.MIDDLE:
-            s_int_r_t_b = np.percentile(s_int_r, 100 - SLCT_PCT / 2)
-            s_int_r_b_b = np.percentile(s_int_r, SLCT_PCT / 2)
+            s_int_r_t_b = np.percentile(s_s_int_r, 100 - SLCT_PCT / 2)
+            s_int_r_b_b = np.percentile(s_s_int_r, SLCT_PCT / 2)
 
         sel_l_cond = _s_s_l
         sel_l_cond &= _int_r >= l_int_r_b_b
@@ -304,14 +318,9 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         sel_s_cond = _s_s_s
         sel_s_cond &= _int_r <= s_int_r_t_b
         sel_s_cond &= _int_r >= s_int_r_b_b
-        _hpr_model = hpr_model[beg: end]
-        l_hpr = _hpr_model[sel_l_cond]
-        s_hpr = _hpr_model[sel_s_cond]
-
-        # _hpr_model = hpr_model[beg: end]
-        # l_hpr = _hpr_model[_s_s_l]
-        # s_hpr = _hpr_model[_s_s_s]
-
+        _s_hpr_model = s_hpr_model[beg: end]
+        l_s_hpr = _s_hpr_model[sel_l_cond]
+        s_s_hpr = _s_hpr_model[sel_s_cond]
 
         _stocks = stocks[beg:end]
         _l_stocks = _stocks[sel_l_cond]
@@ -324,7 +333,7 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
                 s_longs += " "
             s_longs += tickers[_stock_idx]
             s_longs += " "
-            s_longs += str(l_hpr[idx])
+            s_longs += str(l_s_hpr[idx])
             idx += 1
         idx = 0
         for _stock_idx in _s_stocks:
@@ -332,58 +341,100 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
                 s_shorts += " "
             s_shorts += tickers[_stock_idx]
             s_shorts += " "
-            s_shorts += str(s_hpr[idx])
+            s_shorts += str(s_s_hpr[idx])
             idx += 1
 
-        # print(s_longs)
-        # print(s_shorts)
         l_port[w_i] = s_longs
         s_port[w_i] = s_shorts
-        top_hpr[w_i] = np.mean(l_hpr)
-        bottom_hpr[w_i] = np.mean(s_hpr)
+        l_hpr = np.mean(l_s_hpr)
+        s_hpr = np.mean(s_s_hpr)
+        top_hpr[w_i] = l_hpr
+        bottom_hpr[w_i] = s_hpr
+        w_hpr = (l_hpr - s_hpr) / 2
 
-        _t_w_hpr = t_w_hpr[beg: end,:]
-        _t_w_l_hpr = _t_w_hpr[sel_l_cond,:]
-        _t_w_s_hpr = _t_w_hpr[sel_s_cond,:]
-        _t_w_l_hpr_mean = np.mean(_t_w_l_hpr, axis=0)
-        _t_w_s_hpr_mean = np.mean(_t_w_s_hpr, axis=0)
-        _t_w_diff_hpr = (_t_w_l_hpr_mean - _t_w_s_hpr_mean) / 2.0
-        _t_w_diff_hpr = np.min(_t_w_diff_hpr)
+        _t_w_s_s_hpr = t_w_s_hpr[beg: end, :]
+        _t_w_l_s_hpr = _t_w_s_s_hpr[sel_l_cond, :]
+        _t_w_s_s_hpr = _t_w_s_s_hpr[sel_s_cond, :]
+        _t_w_l_s_hpr_mean = np.mean(_t_w_l_s_hpr, axis=0)
+        _t_w_s_s_hpr_mean = np.mean(_t_w_s_s_hpr, axis=0)
+        _t_w_hpr = (_t_w_l_s_hpr_mean - _t_w_s_s_hpr_mean) / 2
+        # calc min w eod hpr
+        _min_w_eod_hpr = np.min(_t_w_hpr)
+        min_w_eod_hpr[w_i] = _min_w_eod_hpr
+        # calc no sl model
+        _model_no_sl_hpr = w_hpr
+        model_no_sl_hpr[w_i] = _model_no_sl_hpr
+        # calc eod sl model
+        _model_eod_sl_hpr = _model_no_sl_hpr
+        sl_idxs = np.nonzero(_t_w_hpr <= STOP_LOSS_HPR)
+        if sl_idxs[0].shape[0] > 0:
+            _model_eod_sl_hpr = _t_w_hpr[sl_idxs[0][0]]
+        model_eod_sl_hpr[w_i] = _model_eod_sl_hpr
 
-        top_stocks_num[w_i] = l_hpr.shape[0]
-        bottom_stocks_num[w_i] = s_hpr.shape[0]
+        # calc lower bound hpr
+        _t_w_s_s_h_hpr = t_w_s_h_hpr[beg: end, :]
+        _t_w_s_s_l_hpr = t_w_s_l_hpr[beg: end, :]
+        _t_w_l_s_lb_hpr = _t_w_s_s_l_hpr[sel_l_cond, :]
+        _t_w_s_s_lb_hpr = _t_w_s_s_h_hpr[sel_s_cond, :]
+        _t_w_l_s_lb_hpr_mean = np.mean(_t_w_l_s_lb_hpr, axis=0)
+        _t_w_s_s_lb_hpr_mean = np.mean(_t_w_s_s_lb_hpr, axis=0)
+        _t_w_lb_hpr = (_t_w_l_s_lb_hpr_mean - _t_w_s_s_lb_hpr_mean) / 2
+        # calc lower bound weekly min
+        _min_w_lb_hpr = np.min(_t_w_lb_hpr)
+        min_w_lb_hpr[w_i] = _min_w_lb_hpr
+        # calc lower bound sl
+        _model_lb_hpr = w_hpr
+        if _min_w_lb_hpr <= STOP_LOSS_HPR:
+            _model_lb_hpr = STOP_LOSS_HPR
+        model_lb_sl_hpr[w_i] = _model_lb_hpr
+        # calc sl by stock model
+        l_condition = _t_w_l_s_lb_hpr > STOP_LOSS_HPR
+        l_condition = np.all(l_condition, axis=1)
+        l_s_sl_hpr = np.where(l_condition, l_s_hpr, STOP_LOSS_HPR)
+        s_condition = _t_w_s_s_lb_hpr < -STOP_LOSS_HPR
+        s_condition = np.all(s_condition, axis=1)
+        s_s_sl_hpr = np.where(s_condition, s_s_hpr, -STOP_LOSS_HPR)
+        l_s_sl_hpr_mean = np.mean(l_s_sl_hpr)
+        s_s_sl_hpr_mean = np.mean(s_s_sl_hpr)
+        _model_s_sl_hpr = (l_s_sl_hpr_mean - s_s_sl_hpr_mean) / 2
+        model_s_sl_hpr[w_i] = _model_s_sl_hpr
 
-    return c_l, c_s, top_hpr, bottom_hpr, top_stocks_num, bottom_stocks_num, l_port, s_port
+        model_hpr[w_i] = _model_no_sl_hpr
+
+    return c_l, c_s, model_hpr, top_hpr, bottom_hpr, min_w_eod_hpr, model_lb_sl_hpr, min_w_lb_hpr, l_port, s_port
 
 
-# s_c_l, s_c_s, t_hpr, b_hpr, t_stocks, b_stocks, l_port, s_port = calc_classes_and_decisions(
+# s_c_l, s_c_s, s_model_hpr, s_t_hpr, s_b_hpr, l_port, s_port = calc_classes_and_decisions(
 #     data_set_records, total_weeks, wr[:, NUM_WEEKS - 1]
 # )
 
 # confusion_matrix(c_l, c_s, s_c_l, s_c_s)
-# hpr_analysis(t_hpr, b_hpr)
-# wealth_graph(t_hpr, b_hpr, w_exit_index, raw_mpl_dt, raw_dt)
+# hpr_analysis(s_t_hpr, s_b_hpr)
+# wealth_graph(s_model_hpr, s_t_hpr, s_b_hpr, w_exit_index, raw_mpl_dt, raw_dt)
 
-e_c_l, e_c_s, t_e_hpr, b_e_hpr, t_e_stocks, b_e_stocks, l_port, s_port = calc_classes_and_decisions(
+e_c_l, e_c_s, e_model_hpr, e_t_hpr, e_b_hpr, e_min_w_hpr, e_model_lb_hpr, e_min_w_lb_hpr, l_port, s_port = calc_classes_and_decisions(
     data_set_records, total_weeks, prob_l
 )
 
 confusion_matrix(c_l[train_records:], c_s[train_records:], e_c_l[train_records:], e_c_s[train_records:])
-hpr_analysis(t_e_hpr[train_weeks:], b_e_hpr[train_weeks:])
-wealth_graph(t_e_hpr[train_weeks:],
-             b_e_hpr[train_weeks:],
+hpr_analysis(e_t_hpr[train_weeks:], e_b_hpr[train_weeks:])
+wealth_graph(e_model_hpr[train_weeks:],
+             e_t_hpr[train_weeks:],
+             e_b_hpr[train_weeks:],
              w_enter_index[train_weeks:],
              w_exit_index[train_weeks:],
              raw_mpl_dt,
-             raw_dt,
-             STOP_LOSS_HPR)
-wealth_csv(t_e_hpr[train_weeks:],
-           b_e_hpr[train_weeks:],
+             raw_dt)
+wealth_csv(e_model_hpr[train_weeks:],
+           e_t_hpr[train_weeks:],
+           e_b_hpr[train_weeks:],
+           e_min_w_hpr[train_weeks:],
+           e_model_lb_hpr[train_weeks:],
+           e_min_w_lb_hpr[train_weeks:],
            w_enter_index[train_weeks:],
            w_exit_index[train_weeks:],
            raw_dt,
            l_port[train_weeks:],
-           s_port[train_weeks:],
-           STOP_LOSS_HPR)
+           s_port[train_weeks:])
 
 plt.show(True)
