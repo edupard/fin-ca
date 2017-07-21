@@ -180,44 +180,26 @@ def wealth_graph(model_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
     fig = plt.figure()
 
     yr = []
-    yr_alt = []
     yts = []
-    c_y = datetime.datetime.fromtimestamp(raw_dt[w_exit_index[0]]).year
-
-    c_yr = 0.
+    c_y = datetime.datetime.fromtimestamp(raw_dt[w_enter_index[0]]).year
     c_y_w = 0
+    c_y_g_r = 0.0
 
-    c_yr_beg_w = 1.
-    c_yr_end_w = wealth[0] + 1.
-
-    w_i = []
-
-    weeks_to_append_year = 365 // 7 * 0.8
+    MIN_WEEKS_TO_APPEND_YEAR = 365 // 7 * 0.8
     for w in range(model_hpr.shape[0]):
-        y = datetime.datetime.fromtimestamp(raw_dt[w_exit_index[w]]).year
-
-        c_yr_end_w = wealth[w] + 1.
-
+        y = datetime.datetime.fromtimestamp(raw_dt[w_enter_index[w]]).year
         if y != c_y:
-            w_i.append(w)
-            if c_y_w > weeks_to_append_year:
-                yr_alt.append((c_yr_end_w - c_yr_beg_w) / c_yr_beg_w * 100.0)
-                yr.append(c_yr * 100.0)
+            # append year data
+            if c_y_w > MIN_WEEKS_TO_APPEND_YEAR:
+                yr.append(c_y_g_r * 100.0)
                 dt = datetime.date(year=c_y, day=1, month=1)
                 yts.append(matplotlib.dates.date2num(dt))
-            c_yr_beg_w = c_yr_end_w
+            c_y_g_r = 0.0
+            c_y_w = 1
             c_y = y
-            c_yr = 0.
-
-            c_y_w = 0
-        c_yr += model_hpr[w]
-        c_y_w += 1
-
-    if c_y_w > weeks_to_append_year:
-        yr_alt.append((c_yr_end_w - c_yr_beg_w) / c_yr_beg_w * 100.0)
-        yr.append(c_yr)
-        dt = datetime.date(year=c_y, day=1, month=1)
-        yts.append(matplotlib.dates.date2num(dt))
+        else:
+            c_y_w += 1
+        c_y_g_r += model_hpr[w]
 
     yr_mean = np.mean(yr)
 
@@ -268,63 +250,45 @@ def wealth_params(model_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
     def calc_sharp(r):
         return math.sqrt(r.shape[0]) * np.mean(r) / np.std(r)
 
+    # calc dd, sharp
     progress = model_hpr
     wealth = np.cumsum(progress) + 1.0
     dd = calc_dd(wealth, False)
     sharp = calc_sharp(model_hpr)
-    # OK - calc dd, sharp
 
+    # calc recap dd
     rc_progress = (model_hpr) + 1.00
     rc_wealth = np.cumprod(rc_progress)
     rc_dd = calc_dd(rc_wealth, True)
-    # OK - calc recap dd
 
+    # calc recap sharp: results are same as without recap
     rc_base = np.cumprod(rc_progress)
     rc_r = (rc_base[1:] - rc_base[:-1]) / rc_base[:-1]
     rc_r = np.concatenate([np.array([rc_base[0] - 1.]), rc_r])
     rc_sharp = calc_sharp(rc_r)
-    # OK - calc recap sharp
 
-    # WTF
+    # calc return by years
     yr = []
-    yr_alt = []
     yts = []
-    c_y = datetime.datetime.fromtimestamp(raw_dt[w_exit_index[0]]).year
-
-    c_yr = 0.
+    c_y = datetime.datetime.fromtimestamp(raw_dt[w_enter_index[0]]).year
     c_y_w = 0
+    c_y_g_r = 0.0
 
-    c_yr_beg_w = 1.
-    c_yr_end_w = wealth[0] + 1.
-
-    w_i = []
-
-    weeks_to_append_year = 365 // 7 * 0.8
+    MIN_WEEKS_TO_APPEND_YEAR = 365 // 7 * 0.8
     for w in range(model_hpr.shape[0]):
-        y = datetime.datetime.fromtimestamp(raw_dt[w_exit_index[w]]).year
-
-        c_yr_end_w = wealth[w] + 1.
-
+        y = datetime.datetime.fromtimestamp(raw_dt[w_enter_index[w]]).year
         if y != c_y:
-            w_i.append(w)
-            if c_y_w > weeks_to_append_year:
-                yr_alt.append((c_yr_end_w - c_yr_beg_w) / c_yr_beg_w * 100.0)
-                yr.append(c_yr * 100.0)
+            # append year data
+            if c_y_w > MIN_WEEKS_TO_APPEND_YEAR:
+                yr.append(c_y_g_r * 100.0)
                 dt = datetime.date(year=c_y, day=1, month=1)
                 yts.append(matplotlib.dates.date2num(dt))
-            c_yr_beg_w = c_yr_end_w
+            c_y_g_r = 0.0
+            c_y_w = 1
             c_y = y
-            c_yr = 0.
-
-            c_y_w = 0
-        c_yr += model_hpr[w]
-        c_y_w += 1
-
-    if c_y_w > weeks_to_append_year:
-        yr_alt.append((c_yr_end_w - c_yr_beg_w) / c_yr_beg_w * 100.0)
-        yr.append(c_yr)
-        dt = datetime.date(year=c_y, day=1, month=1)
-        yts.append(matplotlib.dates.date2num(dt))
+        else:
+            c_y_w += 1
+        c_y_g_r += model_hpr[w]
 
     yr_mean = np.mean(yr)
 
