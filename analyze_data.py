@@ -24,7 +24,6 @@ EXIT_ON_MON_OPEN = True
 
 STOP_LOSS_HPR = -0.05
 
-
 class SelectionAlgo(Enum):
     TOP = 0
     BOTTOM = 1
@@ -32,11 +31,16 @@ class SelectionAlgo(Enum):
     MIDDLE_ALT = 3
 
 
-BET_PCT = 2
+class SelectionType(Enum):
+    PCT = 0
+    FIXED = 1
+
+
+SLCT_TYPE = SelectionType.FIXED
+SLCT_VAL = 2
+
 SLCT_PCT = 100
 SLCT_ALG = SelectionAlgo.TOP
-TOP_N_STOCKS = None
-# TOP_N_STOCKS = 1
 
 tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq_adj.npz')
 
@@ -271,13 +275,13 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _s_c_l |= pred_long_cond
         _s_c_s |= ~pred_long_cond
 
-        top_bound = np.percentile(_prob_l, 100 - BET_PCT)
-        bottom_bound = np.percentile(_prob_l, BET_PCT)
-
-        if TOP_N_STOCKS is not None:
+        if SLCT_TYPE == SelectionType.PCT:
+            top_bound = np.percentile(_prob_l, 100 - SLCT_VAL)
+            bottom_bound = np.percentile(_prob_l, SLCT_VAL)
+        else:
             _prob_l_sorted = np.sort(_prob_l)
-            bottom_bound = _prob_l_sorted[TOP_N_STOCKS - 1]
-            top_bound = _prob_l_sorted[-TOP_N_STOCKS]
+            bottom_bound = _prob_l_sorted[SLCT_VAL - 1]
+            top_bound = _prob_l_sorted[-SLCT_VAL]
 
         _s_s_l = s_l[beg: end]
         _s_s_s = s_s[beg: end]
@@ -401,35 +405,26 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
 
         model_hpr[w_i] = _model_no_sl_hpr
 
-    return c_l, c_s, model_hpr, top_hpr, bottom_hpr, min_w_eod_hpr, model_lb_sl_hpr, min_w_lb_hpr, l_port, s_port
+    return c_l, c_s, model_no_sl_hpr, model_eod_sl_hpr, model_lb_sl_hpr, model_s_sl_hpr, top_hpr, bottom_hpr, min_w_eod_hpr, min_w_lb_hpr, l_port, s_port
 
-
-# s_c_l, s_c_s, s_model_hpr, s_t_hpr, s_b_hpr, l_port, s_port = calc_classes_and_decisions(
-#     data_set_records, total_weeks, wr[:, NUM_WEEKS - 1]
-# )
-
-# confusion_matrix(c_l, c_s, s_c_l, s_c_s)
-# hpr_analysis(s_t_hpr, s_b_hpr)
-# wealth_graph(s_model_hpr, s_t_hpr, s_b_hpr, w_exit_index, raw_mpl_dt, raw_dt)
-
-e_c_l, e_c_s, e_model_hpr, e_t_hpr, e_b_hpr, e_min_w_hpr, e_model_lb_hpr, e_min_w_lb_hpr, l_port, s_port = calc_classes_and_decisions(
+e_c_l, e_c_s, e_model_no_sl_hpr, e_model_eod_sl_hpr, e_model_lb_sl_hpr, e_model_s_sl_hpr, e_t_hpr, e_b_hpr, e_min_w_hpr, e_min_w_lb_hpr, l_port, s_port = calc_classes_and_decisions(
     data_set_records, total_weeks, prob_l
 )
 
 confusion_matrix(c_l[train_records:], c_s[train_records:], e_c_l[train_records:], e_c_s[train_records:])
 hpr_analysis(e_t_hpr[train_weeks:], e_b_hpr[train_weeks:])
-wealth_graph(e_model_hpr[train_weeks:],
-             e_t_hpr[train_weeks:],
-             e_b_hpr[train_weeks:],
+wealth_graph(e_model_no_sl_hpr[train_weeks:],
              w_enter_index[train_weeks:],
              w_exit_index[train_weeks:],
              raw_mpl_dt,
              raw_dt)
-wealth_csv(e_model_hpr[train_weeks:],
+wealth_csv(e_model_no_sl_hpr[train_weeks:],
+           e_model_eod_sl_hpr[train_weeks:],
+           e_model_lb_sl_hpr[train_weeks:],
+           e_model_s_sl_hpr[train_weeks:],
            e_t_hpr[train_weeks:],
            e_b_hpr[train_weeks:],
            e_min_w_hpr[train_weeks:],
-           e_model_lb_hpr[train_weeks:],
            e_min_w_lb_hpr[train_weeks:],
            w_enter_index[train_weeks:],
            w_exit_index[train_weeks:],
