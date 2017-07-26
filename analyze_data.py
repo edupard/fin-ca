@@ -355,29 +355,6 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _l_stocks = _stocks[sel_l_cond]
         _s_stocks = _stocks[sel_s_cond]
 
-        # calc portfolio and returns
-        s_longs = ""
-        s_shorts = ""
-        idx = 0
-        for _stock_idx in _l_stocks:
-            if s_longs != "":
-                s_longs += " "
-            s_longs += tickers[_stock_idx]
-            s_longs += " "
-            s_longs += str(l_s_hpr[idx])
-            idx += 1
-        idx = 0
-        for _stock_idx in _s_stocks:
-            if s_shorts != "":
-                s_shorts += " "
-            s_shorts += tickers[_stock_idx]
-            s_shorts += " "
-            s_shorts += str(s_s_hpr[idx])
-            idx += 1
-
-        l_port[w_i] = s_longs
-        s_port[w_i] = s_shorts
-
         _t_w_eod_num = t_w_eod_num[w_i]
         _t_w_eods = t_w_eods[w_i, :_t_w_eod_num]
         # select eod hpr by stock during the week
@@ -390,15 +367,8 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _t_w_l_s_lb_hpr = _t_w_s_s_l_hpr[sel_l_cond, :]
         _t_w_s_s_lb_hpr = _t_w_s_s_h_hpr[sel_s_cond, :]
 
-        # calc ext idx for each stock and ext hpr by stock
-        _s_l_ext_idx = np.full(_l_stocks.shape, _t_w_eod_num - 1)
-        _s_s_ext_idx = np.full(_s_stocks.shape, _t_w_eod_num - 1)
-        _s_l_stop = np.full(_l_stocks.shape, False)
-        _s_s_stop = np.full(_l_stocks.shape, False)
-        _s_l_ext_hpr = _t_w_l_s_hpr[:, _t_w_eod_num - 1]
-        _s_s_ext_hpr = _t_w_s_s_hpr[:, _t_w_eod_num - 1]
-
-        def calc_params(_t_w_eods,
+        def calc_params(override_ext_lb_hpr,
+                        _t_w_eods,
                         t_w_l_s_hpr,
                         t_w_s_s_hpr,
                         t_w_l_s_lb_hpr,
@@ -419,12 +389,12 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
                 _ext_idx = _s_l_ext_idx[idx]
                 _ext_hpr = _s_l_ext_hpr[idx]
                 _t_w_l_s_hpr[idx, _ext_idx:] = _ext_hpr
-                _t_w_l_s_lb_hpr[idx, _ext_idx:] = _ext_hpr
+                _t_w_l_s_lb_hpr[idx, _ext_idx if override_ext_lb_hpr else _ext_idx + 1:] = _ext_hpr
             for idx in range(_s_s_ext_idx.shape[0]):
                 _ext_idx = _s_s_ext_idx[idx]
                 _ext_hpr = _s_s_ext_hpr[idx]
                 _t_w_s_s_hpr[idx, _ext_idx:] = _ext_hpr
-                _t_w_s_s_lb_hpr[idx, _ext_idx:] = _ext_hpr
+                _t_w_s_s_lb_hpr[idx, _ext_idx if override_ext_lb_hpr else _ext_idx + 1:] = _ext_hpr
 
             # calc portfolio hpr
             _l_s_hpr = _t_w_l_s_hpr[:, -1]
@@ -478,59 +448,145 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
 
             return _l_hpr, _s_hpr, _w_hpr, _min_w_eod_hpr, _min_w_lb_hpr, _l_stops, _s_stops, _s_longs, _s_shorts
 
-        _xyz = calc_params(_t_w_eods,
-                           _t_w_l_s_hpr,
-                           _t_w_s_s_hpr,
-                           _t_w_l_s_lb_hpr,
-                           _t_w_s_s_lb_hpr,
-                           _s_l_ext_idx,
-                           _s_s_ext_idx,
-                           _s_l_stop,
-                           _s_s_stop,
-                           _s_l_ext_hpr,
-                           _s_s_ext_hpr)
+        _default_ext_idx = _t_w_eod_num - 1
 
+        # calc no sl model
+        _s_l_ext_idx = np.full(_l_stocks.shape, _t_w_eod_num - 1)
+        _s_s_ext_idx = np.full(_s_stocks.shape, _t_w_eod_num - 1)
+        _s_l_stop = np.full(_l_stocks.shape, False)
+        _s_s_stop = np.full(_l_stocks.shape, False)
+        _s_l_ext_hpr = _t_w_l_s_hpr[:, _t_w_eod_num - 1]
+        _s_s_ext_hpr = _t_w_s_s_hpr[:, _t_w_eod_num - 1]
+
+        _l_hpr, _s_hpr, _w_hpr, _min_w_eod_hpr, _min_w_lb_hpr, _l_stops, _s_stops, _s_longs, _s_shorts = calc_params(
+            False,
+            _t_w_eods,
+            _t_w_l_s_hpr,
+            _t_w_s_s_hpr,
+            _t_w_l_s_lb_hpr,
+            _t_w_s_s_lb_hpr,
+            _s_l_ext_idx,
+            _s_s_ext_idx,
+            _s_l_stop,
+            _s_s_stop,
+            _s_l_ext_hpr,
+            _s_s_ext_hpr)
+        model_no_sl_hpr[w_i] = _w_hpr
+        min_w_eod_hpr[w_i] = _min_w_eod_hpr
+        min_w_lb_hpr[w_i] = _min_w_lb_hpr
+        l_port[w_i] = _s_longs
+        s_port[w_i] = _s_shorts
+
+        # calc eod model
         _t_w_l_s_hpr_mean = np.mean(_t_w_l_s_hpr, axis=0)
         _t_w_s_s_hpr_mean = np.mean(_t_w_s_s_hpr, axis=0)
         _t_w_hpr = (_t_w_l_s_hpr_mean - _t_w_s_s_hpr_mean) / 2
-        # calc min w eod hpr
-        _min_w_eod_hpr = np.min(_t_w_hpr)
-        min_w_eod_hpr[w_i] = _min_w_eod_hpr
-        # calc no sl model
-        _model_no_sl_hpr = w_hpr
-        model_no_sl_hpr[w_i] = _model_no_sl_hpr
-        # calc eod sl model
-        _model_eod_sl_hpr = _model_no_sl_hpr
         sl_idxs = np.nonzero(_t_w_hpr <= STOP_LOSS_HPR)
+        _ext_idx = _default_ext_idx
+        _stop = False
         if sl_idxs[0].shape[0] > 0:
-            _model_eod_sl_hpr = _t_w_hpr[sl_idxs[0][0]]
-        model_eod_sl_hpr[w_i] = _model_eod_sl_hpr
+            _ext_idx = sl_idxs[0][0]
+            _stop = True
+
+        _s_l_ext_idx = np.full(_l_stocks.shape, _ext_idx)
+        _s_s_ext_idx = np.full(_s_stocks.shape, _ext_idx)
+        _s_l_stop = np.full(_l_stocks.shape, _stop)
+        _s_s_stop = np.full(_l_stocks.shape, _stop)
+        _s_l_ext_hpr = _t_w_l_s_hpr[:, _ext_idx]
+        _s_s_ext_hpr = _t_w_s_s_hpr[:, _ext_idx]
+
+        _l_hpr, _s_hpr, _w_hpr, _min_w_eod_hpr, _min_w_lb_hpr, _l_stops, _s_stops, _s_longs, _s_shorts = calc_params(
+            False,
+            _t_w_eods,
+            _t_w_l_s_hpr,
+            _t_w_s_s_hpr,
+            _t_w_l_s_lb_hpr,
+            _t_w_s_s_lb_hpr,
+            _s_l_ext_idx,
+            _s_s_ext_idx,
+            _s_l_stop,
+            _s_s_stop,
+            _s_l_ext_hpr,
+            _s_s_ext_hpr)
+
+        model_eod_sl_hpr[w_i] = _w_hpr
 
         # calc lower bound hpr
         _t_w_l_s_lb_hpr_mean = np.mean(_t_w_l_s_lb_hpr, axis=0)
         _t_w_s_s_lb_hpr_mean = np.mean(_t_w_s_s_lb_hpr, axis=0)
         _t_w_lb_hpr = (_t_w_l_s_lb_hpr_mean - _t_w_s_s_lb_hpr_mean) / 2
-        # calc lower bound weekly min
-        _min_w_lb_hpr = np.min(_t_w_lb_hpr)
-        min_w_lb_hpr[w_i] = _min_w_lb_hpr
-        # calc lower bound sl
-        _model_lb_hpr = w_hpr
-        if _min_w_lb_hpr <= STOP_LOSS_HPR:
-            _model_lb_hpr = STOP_LOSS_HPR
-        model_lb_sl_hpr[w_i] = _model_lb_hpr
-        # calc sl by stock model
-        l_condition = _t_w_l_s_lb_hpr > STOP_LOSS_HPR
-        l_condition = np.all(l_condition, axis=1)
-        l_s_sl_hpr = np.where(l_condition, l_s_hpr, STOP_LOSS_HPR)
-        s_condition = _t_w_s_s_lb_hpr < -STOP_LOSS_HPR
-        s_condition = np.all(s_condition, axis=1)
-        s_s_sl_hpr = np.where(s_condition, s_s_hpr, -STOP_LOSS_HPR)
-        l_s_sl_hpr_mean = np.mean(l_s_sl_hpr)
-        s_s_sl_hpr_mean = np.mean(s_s_sl_hpr)
-        _model_s_sl_hpr = (l_s_sl_hpr_mean - s_s_sl_hpr_mean) / 2
-        model_s_sl_hpr[w_i] = _model_s_sl_hpr
 
-        model_hpr[w_i] = _model_no_sl_hpr
+        sl_idxs = np.nonzero(_t_w_lb_hpr <= STOP_LOSS_HPR)
+        _ext_idx = _t_w_eod_num - 1
+        _stop = False
+        if sl_idxs[0].shape[0] > 0:
+            _ext_idx = sl_idxs[0][0]
+            _stop = True
+
+        _s_l_ext_idx = np.full(_l_stocks.shape, _ext_idx)
+        _s_s_ext_idx = np.full(_s_stocks.shape, _ext_idx)
+        _s_l_stop = np.full(_l_stocks.shape, _stop)
+        _s_s_stop = np.full(_l_stocks.shape, _stop)
+        if _stop:
+            _s_l_ext_hpr = np.full(_l_stocks.shape, STOP_LOSS_HPR)
+            _s_s_ext_hpr = np.full(_l_stocks.shape, -STOP_LOSS_HPR)
+        else:
+            _s_l_ext_hpr = _t_w_l_s_hpr[:, _ext_idx]
+            _s_s_ext_hpr = _t_w_s_s_hpr[:, _ext_idx]
+
+        _l_hpr, _s_hpr, _w_hpr, _min_w_eod_hpr, _min_w_lb_hpr, _l_stops, _s_stops, _s_longs, _s_shorts = calc_params(
+            True,
+            _t_w_eods,
+            _t_w_l_s_hpr,
+            _t_w_s_s_hpr,
+            _t_w_l_s_lb_hpr,
+            _t_w_s_s_lb_hpr,
+            _s_l_ext_idx,
+            _s_s_ext_idx,
+            _s_l_stop,
+            _s_s_stop,
+            _s_l_ext_hpr,
+            _s_s_ext_hpr)
+
+        model_lb_sl_hpr[w_i] = _w_hpr
+
+        # calc sl by stock model
+        def first_true_idx_by_row(mask, default_idx):
+            idxs = np.full(mask.shape[0], default_idx)
+            for i, ele in enumerate(np.argmax(mask, axis=1)):
+                if ele == 0 and mask[i][0] == 0:
+                    idxs[i] = default_idx
+                else:
+                    idxs[i] = ele
+
+            return idxs
+
+        _s_l_stop_mask = _t_w_l_s_lb_hpr <= STOP_LOSS_HPR
+        _s_l_stop = np.any(_s_l_stop_mask, axis=1)
+        _s_l_ext_idx = first_true_idx_by_row(_s_l_stop_mask, _default_ext_idx)
+        _s_l_ext_hpr = _t_w_l_s_hpr[:, _default_ext_idx]
+        _s_l_ext_hpr[_s_l_stop] = STOP_LOSS_HPR
+
+        _s_s_stop_mask = _t_w_s_s_lb_hpr >= -STOP_LOSS_HPR
+        _s_s_stop = np.any(_s_s_stop_mask, axis=1)
+        _s_s_ext_idx = first_true_idx_by_row(_s_s_stop_mask, _default_ext_idx)
+        _s_s_ext_hpr = _t_w_s_s_hpr[:, _default_ext_idx]
+        _s_s_ext_hpr[_s_s_stop] = -STOP_LOSS_HPR
+
+        _l_hpr, _s_hpr, _w_hpr, _min_w_eod_hpr, _min_w_lb_hpr, _l_stops, _s_stops, _s_longs, _s_shorts = calc_params(
+            True,
+            _t_w_eods,
+            _t_w_l_s_hpr,
+            _t_w_s_s_hpr,
+            _t_w_l_s_lb_hpr,
+            _t_w_s_s_lb_hpr,
+            _s_l_ext_idx,
+            _s_s_ext_idx,
+            _s_l_stop,
+            _s_s_stop,
+            _s_l_ext_hpr,
+            _s_s_ext_hpr)
+        model_s_sl_hpr[w_i] = _w_hpr
 
     return c_l, c_s, model_no_sl_hpr, model_eod_sl_hpr, model_lb_sl_hpr, model_s_sl_hpr, top_hpr, bottom_hpr, min_w_eod_hpr, min_w_lb_hpr, l_port, s_port
 
