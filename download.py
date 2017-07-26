@@ -5,8 +5,10 @@ import datetime
 
 # BEG = datetime.datetime.strptime('2017-07-06', '%Y-%m-%d').date()
 # END = datetime.datetime.strptime('2017-07-07', '%Y-%m-%d').date()
-BEG = datetime.datetime.strptime('2017-07-08', '%Y-%m-%d').date()
-END = datetime.datetime.strptime('2017-07-16', '%Y-%m-%d').date()
+# BEG = datetime.datetime.strptime('2017-07-08', '%Y-%m-%d').date()
+# END = datetime.datetime.strptime('2017-07-16', '%Y-%m-%d').date()
+BEG = datetime.datetime.strptime('2017-07-17', '%Y-%m-%d').date()
+END = datetime.datetime.strptime('2017-07-23', '%Y-%m-%d').date()
 
 tickers = get_nyse_nasdaq_tickers()
 download_data(tickers, 'data/prices_append.csv', BEG, END)

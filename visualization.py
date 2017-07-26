@@ -103,7 +103,7 @@ def confusion_matrix(a_l, a_s, p_l, p_s):
     ))
 
 
-def wealth_graph(model_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
+def wealth_graph(wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years, w_exit_index, raw_mpl_dt):
     def format_time_labels(ax, fmt):
         ax.xaxis.set_major_formatter(fmt)
         for label in ax.xaxis.get_ticklabels():
@@ -115,119 +115,38 @@ def wealth_graph(model_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
     def hide_time_labels(ax):
         plt.setp(ax.get_xticklabels(), visible=False)
 
-    def calc_dd(c, recap):
-        # c == capital in time array
-        # recap == flag indicating recapitalization or fixed bet
-        def generate_previous_max():
-            max = c[0]
-            for idx in range(len(c)):
-                # update max
-                if c[idx] > max:
-                    max = c[idx]
-                yield max
-
-        prev_max = np.fromiter(generate_previous_max(), dtype=np.float64)
-        if recap:
-            dd_a = (c - prev_max) / prev_max
-        else:
-            dd_a = c - prev_max
-
-        return np.min(dd_a) * 100.0
-
-    def calc_sharp(r):
-        return math.sqrt(r.shape[0]) * np.mean(r) / np.std(r)
-
     fig = plt.figure()
-
-    # diff = (t_hpr - b_hpr) / 2
-    # diff = np.maximum(diff, STOP_LOSS_HPR)
-
-    progress = model_hpr
-    # wealth = np.cumsum(progress)
-    wealth = np.cumsum(progress) + 1.0
-    dd = calc_dd(wealth, False)
-    sharp = calc_sharp(model_hpr)
-
     ax = fig.add_subplot(1, 1, 1)
     draw_grid(ax)
     format_time_labels(ax, fmt=DDMMMYY_FMT)
-    ax.set_title("1 USD PL Sharpe: %.2f Draw down: %.2f" % (sharp, dd))
+    ax.set_title("1 USD PL Sharpe: %.2f Draw down: %.2f" % (sharpe, dd * 100))
     ax.plot_date(raw_mpl_dt[w_exit_index], wealth, color='b', fmt='-')
-
-    rc_progress = (model_hpr) + 1.00
-    # rc_wealth = np.cumprod(rc_progress) - 1.
-    rc_wealth = np.cumprod(rc_progress)
-    rc_dd = calc_dd(rc_wealth, True)
-
-    rc_base = np.cumprod(rc_progress)
-    rc_r = (rc_base[1:] - rc_base[:-1]) / rc_base[:-1]
-    rc_r = np.concatenate([np.array([rc_base[0] - 1.]), rc_r])
-    rc_sharp = calc_sharp(rc_r)
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1, sharex=ax)
     draw_grid(ax)
     # hide_time_labels(ax)
-    ax.set_title("1 USD PL RECAP Draw down: %.2f" % (rc_dd))
+    ax.set_title("1 USD PL RECAP Draw down: %.2f" % (rc_dd * 100))
     ax.plot_date(raw_mpl_dt[w_exit_index], rc_wealth, color='b', fmt='-')
     format_time_labels(ax, fmt=DDMMMYY_FMT)
-    # ax = fig.add_subplot(3, 1, 3, sharex=ax)
-    # draw_grid(ax)
-    # format_time_labels(ax)
-    # ax.plot_date(raw_mpl_dt[w_exit_index], t_stocks, color='g', fmt='o')
-    # ax.plot_date(raw_mpl_dt[w_exit_index], b_stocks, color='r', fmt='o')
+
+    yr = np.array(yr)
+    yts = []
+    for y in years:
+        dt = datetime.date(year=y, day=1, month=1)
+        yts.append(matplotlib.dates.date2num(dt))
+    yts = np.array(yts)
 
     fig = plt.figure()
-
-    yr = []
-    yts = []
-    c_y = datetime.datetime.fromtimestamp(raw_dt[w_enter_index[0]]).year
-    c_y_w = 0
-    c_y_g_r = 0.0
-
-    MIN_WEEKS_TO_APPEND_YEAR = 365 // 7 * 0.8
-    for w in range(model_hpr.shape[0]):
-        y = datetime.datetime.fromtimestamp(raw_dt[w_enter_index[w]]).year
-        if y != c_y:
-            # append year data
-            if c_y_w > MIN_WEEKS_TO_APPEND_YEAR:
-                yr.append(c_y_g_r * 100.0)
-                dt = datetime.date(year=c_y, day=1, month=1)
-                yts.append(matplotlib.dates.date2num(dt))
-            c_y_g_r = 0.0
-            c_y_w = 1
-            c_y = y
-        else:
-            c_y_w += 1
-        c_y_g_r += model_hpr[w]
-
-    yr_mean = np.mean(yr)
-
     ax = fig.add_subplot(1, 1, 1)
     draw_grid(ax)
     format_time_labels(ax, fmt=YYYY_FMT)
-    ax.bar(yts, yr, color='b', width=100)
+    ax.bar(yts, yr * 100, color='b', width=100)
     ax.xaxis_date()
     ax.set_title("Year pct return")
 
-    w_dd = np.min(model_hpr) * 100.0
-    w_r_avg = np.mean(model_hpr) * 100.0
-    w_r_best = np.max(model_hpr) * 100.0
-    print(
-        "F: {:.2f} DD: {:.2f} W_DD: {:.2f} W_AVG: {:.2f} W_BEST: {:.2f} SHARPE: {:.2f} AVG_YEAR: {:.2f} F_R: {:.2f} DD_R: {:.2f}".format(
-            wealth[-1],
-            dd,
-            w_dd,
-            w_r_avg,
-            w_r_best,
-            sharp,
-            yr_mean,
-            rc_wealth[-1],
-            rc_dd
-        ))
 
-
-def wealth_params(model_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
+def calc_wealth(model_hpr, w_enter_index, raw_dt):
     def calc_dd(c, recap):
         # c == capital in time array
         # recap == flag indicating recapitalization or fixed bet
@@ -245,7 +164,7 @@ def wealth_params(model_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
         else:
             dd_a = c - prev_max
 
-        return np.min(dd_a) * 100.0
+        return np.min(dd_a)
 
     def calc_sharp(r):
         return math.sqrt(r.shape[0]) * np.mean(r) / np.std(r)
@@ -254,7 +173,7 @@ def wealth_params(model_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
     progress = model_hpr
     wealth = np.cumsum(progress) + 1.0
     dd = calc_dd(wealth, False)
-    sharp = calc_sharp(model_hpr)
+    sharpe = calc_sharp(model_hpr)
 
     # calc recap dd
     rc_progress = (model_hpr) + 1.00
@@ -265,11 +184,11 @@ def wealth_params(model_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
     rc_base = np.cumprod(rc_progress)
     rc_r = (rc_base[1:] - rc_base[:-1]) / rc_base[:-1]
     rc_r = np.concatenate([np.array([rc_base[0] - 1.]), rc_r])
-    rc_sharp = calc_sharp(rc_r)
+    rc_sharpe = calc_sharp(rc_r)
 
     # calc return by years
     yr = []
-    yts = []
+    years = []
     c_y = datetime.datetime.fromtimestamp(raw_dt[w_enter_index[0]]).year
     c_y_w = 0
     c_y_g_r = 0.0
@@ -280,9 +199,8 @@ def wealth_params(model_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
         if y != c_y:
             # append year data
             if c_y_w > MIN_WEEKS_TO_APPEND_YEAR:
-                yr.append(c_y_g_r * 100.0)
-                dt = datetime.date(year=c_y, day=1, month=1)
-                yts.append(matplotlib.dates.date2num(dt))
+                yr.append(c_y_g_r)
+                years.append(c_y)
             c_y_g_r = 0.0
             c_y_w = 1
             c_y = y
@@ -290,23 +208,7 @@ def wealth_params(model_hpr, w_enter_index, w_exit_index, raw_mpl_dt, raw_dt):
             c_y_w += 1
         c_y_g_r += model_hpr[w]
 
-    yr_mean = np.mean(yr)
-
-    w_dd = np.min(model_hpr) * 100.0
-    w_r_avg = np.mean(model_hpr) * 100.0
-    w_r_best = np.max(model_hpr) * 100.0
-    print(
-        "F: {:.2f} DD: {:.2f} W_DD: {:.2f} W_AVG: {:.2f} W_BEST: {:.2f} SHARPE: {:.2f} AVG_YEAR: {:.2f} F_R: {:.2f} DD_R: {:.2f}".format(
-            wealth[-1],
-            dd,
-            w_dd,
-            w_r_avg,
-            w_r_best,
-            sharp,
-            yr_mean,
-            rc_wealth[-1],
-            rc_dd
-        ))
+    return wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years
 
 
 def wealth_csv(model_no_sl_hpr,

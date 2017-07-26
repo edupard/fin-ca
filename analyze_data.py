@@ -9,7 +9,7 @@ from data_utils import filter_activelly_tradeable_stocks, convert_to_mpl_time, g
     get_one_trading_date, get_dates_for_weekly_return, get_tradable_stock_indexes, get_prices, \
     PxType, calc_z_score, get_tradable_stocks_mask, get_intermediate_dates
 from download_utils import load_npz_data, load_npz_data_alt
-from visualization import wealth_graph, confusion_matrix, hpr_analysis, wealth_csv
+from visualization import wealth_graph, confusion_matrix, hpr_analysis, wealth_csv, calc_wealth
 from visualization import plot_20_random_stock_prices, plot_traded_stocks_per_day
 from nn import train_ae, train_ffnn, train_rbm, evaluate_ffnn
 from date_range import HIST_BEG, HIST_END
@@ -22,7 +22,6 @@ ENT_MON_OPEN = True
 EXIT_ON_MON = False
 EXIT_ON_MON_OPEN = True
 
-STOP_LOSS_HPR = -0.05
 
 class SelectionAlgo(Enum):
     TOP = 0
@@ -36,11 +35,23 @@ class SelectionType(Enum):
     FIXED = 1
 
 
+class StopLossType(Enum):
+    NO = 0
+    EOD = 1
+    LB = 2
+    STOCK = 3
+
+
 SLCT_TYPE = SelectionType.FIXED
-SLCT_VAL = 2
+SLCT_VAL = 4
 
 SLCT_PCT = 100
 SLCT_ALG = SelectionAlgo.TOP
+
+STOP_LOSS_HPR = -0.19
+STOP_LOSS_TYPE = StopLossType.STOCK
+
+GRID_SEARCH = False
 
 tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq_adj.npz')
 
@@ -407,29 +418,146 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
 
     return c_l, c_s, model_no_sl_hpr, model_eod_sl_hpr, model_lb_sl_hpr, model_s_sl_hpr, top_hpr, bottom_hpr, min_w_eod_hpr, min_w_lb_hpr, l_port, s_port
 
+
 e_c_l, e_c_s, e_model_no_sl_hpr, e_model_eod_sl_hpr, e_model_lb_sl_hpr, e_model_s_sl_hpr, e_t_hpr, e_b_hpr, e_min_w_hpr, e_min_w_lb_hpr, l_port, s_port = calc_classes_and_decisions(
     data_set_records, total_weeks, prob_l
 )
 
-confusion_matrix(c_l[train_records:], c_s[train_records:], e_c_l[train_records:], e_c_s[train_records:])
-hpr_analysis(e_t_hpr[train_weeks:], e_b_hpr[train_weeks:])
-wealth_graph(e_model_no_sl_hpr[train_weeks:],
-             w_enter_index[train_weeks:],
-             w_exit_index[train_weeks:],
-             raw_mpl_dt,
-             raw_dt)
-wealth_csv(e_model_no_sl_hpr[train_weeks:],
-           e_model_eod_sl_hpr[train_weeks:],
-           e_model_lb_sl_hpr[train_weeks:],
-           e_model_s_sl_hpr[train_weeks:],
-           e_t_hpr[train_weeks:],
-           e_b_hpr[train_weeks:],
-           e_min_w_hpr[train_weeks:],
-           e_min_w_lb_hpr[train_weeks:],
-           w_enter_index[train_weeks:],
-           w_exit_index[train_weeks:],
-           raw_dt,
-           l_port[train_weeks:],
-           s_port[train_weeks:])
+if GRID_SEARCH:
+    with open('./data/grid_search.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            (
+                'stop loss type',
+                'stop loss',
+                'selection',
+                'type',
+                'wealth',
+                'max dd',
+                'w dd',
+                'w avg',
+                'w best',
+                'sharpe',
+                'y avg',
+                'recap wealth',
+                'recap max dd'
+            ))
 
-plt.show(True)
+        SLCT_TYPE = SelectionType.FIXED
+        SLCT_VAL = 2
+        STOP_LOSS_HPR = -0.05
+
+
+        def print_rows_for_fixed_params():
+            e_c_l, e_c_s, e_model_no_sl_hpr, e_model_eod_sl_hpr, e_model_lb_sl_hpr, e_model_s_sl_hpr, e_t_hpr, e_b_hpr, e_min_w_hpr, e_min_w_lb_hpr, l_port, s_port = calc_classes_and_decisions(
+                data_set_records, total_weeks, prob_l
+            )
+
+            def print_row(model_hpr, sl_type):
+                wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(model_hpr[train_weeks:],
+                                                                                         w_enter_index[train_weeks:],
+                                                                                         raw_dt[train_weeks:])
+
+                yr_avg = np.mean(yr)
+                w_dd = np.min(model_hpr)
+                w_avg = np.mean(model_hpr)
+                w_best = np.max(model_hpr)
+
+                writer.writerow(
+                    (
+                        sl_type,
+                        STOP_LOSS_HPR,
+                        SLCT_VAL,
+                        'pct' if SLCT_TYPE == SelectionType.PCT else 'fixed',
+                        wealth[-1],
+                        dd,
+                        w_dd,
+                        w_avg,
+                        w_best,
+                        sharpe,
+                        yr_avg,
+                        rc_wealth[-1],
+                        rc_dd
+                    ))
+
+            print_row(e_model_no_sl_hpr, 'no')
+            print_row(e_model_eod_sl_hpr, 'eod')
+            print_row(e_model_lb_sl_hpr, 'lower bound')
+            print_row(e_model_s_sl_hpr, 'stock')
+
+
+        # grid search
+        SLCT_TYPE = SelectionType.FIXED
+        for SLCT_VAL in range(1, 16):
+            for STOP_LOSS_HPR in np.linspace(-0.01, -0.40, 39 * 2 + 1):
+                print_rows_for_fixed_params()
+        SLCT_TYPE = SelectionType.PCT
+        for SLCT_VAL in np.linspace(0.5, 15, 30):
+            for STOP_LOSS_HPR in np.linspace(-0.01, -0.40, 39 * 2 + 1):
+                print_rows_for_fixed_params()
+
+else:
+    confusion_matrix(c_l[train_records:],
+                     c_s[train_records:],
+                     e_c_l[train_records:],
+                     e_c_s[train_records:])
+    hpr_analysis(e_t_hpr[train_weeks:],
+                 e_b_hpr[train_weeks:])
+
+    type_to_idx = {
+        StopLossType.NO: e_model_no_sl_hpr,
+        StopLossType.EOD: e_model_eod_sl_hpr,
+        StopLossType.LB: e_model_lb_sl_hpr,
+        StopLossType.STOCK: e_model_s_sl_hpr
+    }
+
+    e_model_hpr = type_to_idx.get(STOP_LOSS_TYPE, e_model_no_sl_hpr)
+
+    wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(e_model_hpr[train_weeks:],
+                                                                             w_enter_index[train_weeks:],
+                                                                             raw_dt[train_weeks:])
+
+    yr_avg = np.mean(yr)
+    w_dd = np.min(e_model_hpr)
+    w_avg = np.mean(e_model_hpr)
+    w_best = np.max(e_model_hpr)
+
+    print(
+        "F: {:.2f} DD: {:.2f} W_DD: {:.2f} W_AVG: {:.2f} W_BEST: {:.2f} SHARPE: {:.2f} AVG_YEAR: {:.2f} F_R: {:.2f} DD_R: {:.2f}".format(
+            wealth[-1],
+            dd * 100.0,
+            w_dd * 100.0,
+            w_avg * 100.0,
+            w_best * 100.0,
+            sharpe,
+            yr_avg * 100.0,
+            rc_wealth[-1],
+            rc_dd * 100.0
+        ))
+
+    wealth_graph(wealth,
+                 dd,
+                 sharpe,
+                 rc_wealth,
+                 rc_dd,
+                 rc_sharpe,
+                 yr,
+                 years,
+                 w_exit_index,
+                 raw_mpl_dt)
+
+    wealth_csv(e_model_no_sl_hpr[train_weeks:],
+               e_model_eod_sl_hpr[train_weeks:],
+               e_model_lb_sl_hpr[train_weeks:],
+               e_model_s_sl_hpr[train_weeks:],
+               e_t_hpr[train_weeks:],
+               e_b_hpr[train_weeks:],
+               e_min_w_hpr[train_weeks:],
+               e_min_w_lb_hpr[train_weeks:],
+               w_enter_index[train_weeks:],
+               w_exit_index[train_weeks:],
+               raw_dt,
+               l_port[train_weeks:],
+               s_port[train_weeks:])
+
+    plt.show(True)
