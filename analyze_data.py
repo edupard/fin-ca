@@ -80,6 +80,7 @@ wr = None
 t_w_s_hpr = None
 t_w_s_h_hpr = None
 t_w_s_l_hpr = None
+t_w_eod_num = None
 s_hpr = None
 s_hpr_model = None
 s_int_r = None
@@ -223,6 +224,9 @@ while True:
     stocks = append_data(stocks, t_s_i)
     dr = append_data(dr, d_n_r)
     wr = append_data(wr, w_n_r)
+    # intermediate week points num
+    _t_w_eod_num = _t_w_s_hpr.shape[1]
+    t_w_eod_num = append_data(t_w_eod_num, np.array([_t_w_eod_num]))
     t_w_s_hpr = append_data_and_pad_with_zeros(t_w_s_hpr, _t_w_s_hpr)
     t_w_s_h_hpr = append_data_and_pad_with_zeros(t_w_s_h_hpr, _t_w_s_h_hpr)
     t_w_s_l_hpr = append_data_and_pad_with_zeros(t_w_s_l_hpr, _t_w_s_l_hpr)
@@ -303,8 +307,6 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _int_r = s_int_r[beg:end]
         l_s_int_r = _int_r[_s_s_l]
         s_s_int_r = _int_r[_s_s_s]
-        l_s_int_r_sorted = np.sort(l_s_int_r)
-        s_s_int_r_sorted = np.sort(s_s_int_r)
 
         if SLCT_ALG == SelectionAlgo.TOP:
             l_int_r_t_b = np.max(l_s_int_r)
@@ -333,13 +335,24 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         sel_s_cond = _s_s_s
         sel_s_cond &= _int_r <= s_int_r_t_b
         sel_s_cond &= _int_r >= s_int_r_b_b
+
+        # calc stocks hpr
         _s_hpr_model = s_hpr_model[beg: end]
         l_s_hpr = _s_hpr_model[sel_l_cond]
         s_s_hpr = _s_hpr_model[sel_s_cond]
+        # calc portfolio hpr
+        l_hpr = np.mean(l_s_hpr)
+        s_hpr = np.mean(s_s_hpr)
+        top_hpr[w_i] = l_hpr
+        bottom_hpr[w_i] = s_hpr
+        w_hpr = (l_hpr - s_hpr) / 2
 
+        # select long and short stocks in portfolio
         _stocks = stocks[beg:end]
         _l_stocks = _stocks[sel_l_cond]
         _s_stocks = _stocks[sel_s_cond]
+
+        # calc portfolio and returns
         s_longs = ""
         s_shorts = ""
         idx = 0
@@ -361,15 +374,18 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
 
         l_port[w_i] = s_longs
         s_port[w_i] = s_shorts
-        l_hpr = np.mean(l_s_hpr)
-        s_hpr = np.mean(s_s_hpr)
-        top_hpr[w_i] = l_hpr
-        bottom_hpr[w_i] = s_hpr
-        w_hpr = (l_hpr - s_hpr) / 2
 
-        _t_w_s_s_hpr = t_w_s_hpr[beg: end, :]
+        _t_w_eod_num = t_w_eod_num[w_i]
+        # select eod hpr by stock during the week
+        _t_w_s_s_hpr = t_w_s_hpr[beg: end, :_t_w_eod_num]
         _t_w_l_s_hpr = _t_w_s_s_hpr[sel_l_cond, :]
         _t_w_s_s_hpr = _t_w_s_s_hpr[sel_s_cond, :]
+        # select lb hpr by stock during the week
+        _t_w_s_s_h_hpr = t_w_s_h_hpr[beg: end, :_t_w_eod_num]
+        _t_w_s_s_l_hpr = t_w_s_l_hpr[beg: end, :_t_w_eod_num]
+        _t_w_l_s_lb_hpr = _t_w_s_s_l_hpr[sel_l_cond, :]
+        _t_w_s_s_lb_hpr = _t_w_s_s_h_hpr[sel_s_cond, :]
+
         _t_w_l_s_hpr_mean = np.mean(_t_w_l_s_hpr, axis=0)
         _t_w_s_s_hpr_mean = np.mean(_t_w_s_s_hpr, axis=0)
         _t_w_hpr = (_t_w_l_s_hpr_mean - _t_w_s_s_hpr_mean) / 2
@@ -387,10 +403,7 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         model_eod_sl_hpr[w_i] = _model_eod_sl_hpr
 
         # calc lower bound hpr
-        _t_w_s_s_h_hpr = t_w_s_h_hpr[beg: end, :]
-        _t_w_s_s_l_hpr = t_w_s_l_hpr[beg: end, :]
-        _t_w_l_s_lb_hpr = _t_w_s_s_l_hpr[sel_l_cond, :]
-        _t_w_s_s_lb_hpr = _t_w_s_s_h_hpr[sel_s_cond, :]
+
         _t_w_l_s_lb_hpr_mean = np.mean(_t_w_l_s_lb_hpr, axis=0)
         _t_w_s_s_lb_hpr_mean = np.mean(_t_w_s_s_lb_hpr, axis=0)
         _t_w_lb_hpr = (_t_w_l_s_lb_hpr_mean - _t_w_s_s_lb_hpr_mean) / 2
