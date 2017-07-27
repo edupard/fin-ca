@@ -211,34 +211,42 @@ def calc_wealth(model_hpr, w_enter_index, raw_dt):
     return wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years
 
 
-def wealth_csv(model_no_sl_hpr,
-               model_eod_sl_hpr,
-               model_lb_sl_hpr,
-               model_s_sl_hpr,
-               min_w_hpr,
-               min_w_lb_hpr,
+def wealth_csv(sl_name,
+               beg,
+               end,
                w_enter_index,
                w_exit_index,
                raw_dt,
-               l_port,
-               s_port):
-    progress = model_no_sl_hpr
+               model):
+    model_hpr, model_min_w_eod_hpr, model_min_w_lb_hpr, model_l_stops, model_s_stops, model_l_port, model_s_port = model
+    model_hpr = model_hpr[beg:end]
+    model_min_w_eod_hpr = model_min_w_eod_hpr[beg:end]
+    model_min_w_lb_hpr = model_min_w_lb_hpr[beg:end]
+    model_l_stops = model_l_stops[beg:end]
+    model_s_stops = model_s_stops[beg:end]
+    model_l_port = model_l_port[beg:end]
+    model_s_port = model_s_port[beg:end]
+    w_enter_index = w_enter_index[beg:end]
+    w_exit_index = w_exit_index[beg:end]
+
+    progress = model_hpr
     wealth = np.cumsum(progress) + 1.0
 
-    with open('./data/weekly.csv', 'w', newline='') as f:
+    with open('./data/weekly_{}_sl.csv'.format(sl_name), 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(
             (
                 'beg',
                 'end',
-                'wealth',
-                'no sl',
-                'eod sl',
-                'lb sl',
-                'stock sl',
-                'min w hpr',
-                'min w lb hpr',
-                'longs', 'shorts'))
+                '%s sl wealth' % sl_name,
+                '%s sl hpr' % sl_name,
+                '%s sl min w' % sl_name,
+                '%s sl min w lb' % sl_name,
+                '%s sl l stops' % sl_name,
+                '%s sl s stops' % sl_name,
+                '%s sl l port' % sl_name,
+                '%s sl s port' % sl_name)
+        )
         for w in range(wealth.shape[0]):
             dt_enter = datetime.datetime.fromtimestamp(raw_dt[w_enter_index[w]])
             dt_exit = datetime.datetime.fromtimestamp(raw_dt[w_exit_index[w]])
@@ -246,11 +254,12 @@ def wealth_csv(model_no_sl_hpr,
                 (dt_enter.strftime('%Y-%m-%d'),
                  dt_exit.strftime('%Y-%m-%d'),
                  wealth[w],
-                 model_no_sl_hpr[w],
-                 model_eod_sl_hpr[w],
-                 model_lb_sl_hpr[w],
-                 model_s_sl_hpr[w],
-                 min_w_hpr[w],
-                 min_w_lb_hpr[w],
-                 l_port[w],
-                 s_port[w]))
+                 "%.2f%%" % (model_hpr[w] * 100.0),
+                 "%.2f%%" % (model_min_w_eod_hpr[w] * 100.0),
+                 "%.2f%%" % (model_min_w_lb_hpr[w] * 100.0),
+                 model_l_stops[w],
+                 model_s_stops[w],
+                 model_l_port[w],
+                 model_s_port[w]
+                 )
+            )

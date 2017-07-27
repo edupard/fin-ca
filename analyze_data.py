@@ -266,14 +266,36 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
     s_s = np.zeros((data_set_records), dtype=np.bool)
 
     model_no_sl_hpr = np.zeros((total_weeks))
-    model_eod_sl_hpr = np.zeros((total_weeks))
-    model_lb_sl_hpr = np.zeros((total_weeks))
-    model_s_sl_hpr = np.zeros((total_weeks))
+    min_w_eod_hpr_no_sl = np.zeros((total_weeks))
+    min_w_lb_hpr_no_sl = np.zeros((total_weeks))
+    l_port_no_sl = np.empty((total_weeks), dtype=np.object)
+    s_port_no_sl = np.empty((total_weeks), dtype=np.object)
+    l_stops_no_sl = np.zeros((total_weeks))
+    s_stops_no_sl = np.zeros((total_weeks))
 
-    min_w_eod_hpr = np.zeros((total_weeks))
-    min_w_lb_hpr = np.zeros((total_weeks))
-    l_port = np.empty((total_weeks), dtype=np.object)
-    s_port = np.empty((total_weeks), dtype=np.object)
+    model_eod_sl_hpr = np.zeros((total_weeks))
+    min_w_eod_hpr_eod_sl = np.zeros((total_weeks))
+    min_w_lb_hpr_eod_sl = np.zeros((total_weeks))
+    l_port_eod_sl = np.empty((total_weeks), dtype=np.object)
+    s_port_eod_sl = np.empty((total_weeks), dtype=np.object)
+    l_stops_eod_sl = np.zeros((total_weeks))
+    s_stops_eod_sl = np.zeros((total_weeks))
+
+    model_lb_sl_hpr = np.zeros((total_weeks))
+    min_w_eod_hpr_lb_sl = np.zeros((total_weeks))
+    min_w_lb_hpr_lb_sl = np.zeros((total_weeks))
+    l_port_lb_sl = np.empty((total_weeks), dtype=np.object)
+    s_port_lb_sl = np.empty((total_weeks), dtype=np.object)
+    l_stops_lb_sl = np.zeros((total_weeks))
+    s_stops_lb_sl = np.zeros((total_weeks))
+
+    model_s_sl_hpr = np.zeros((total_weeks))
+    min_w_eod_hpr_s_sl = np.zeros((total_weeks))
+    min_w_lb_hpr_s_sl = np.zeros((total_weeks))
+    l_port_s_sl = np.empty((total_weeks), dtype=np.object)
+    s_port_s_sl = np.empty((total_weeks), dtype=np.object)
+    l_stops_s_sl = np.zeros((total_weeks))
+    s_stops_s_sl = np.zeros((total_weeks))
 
     for i in range(total_weeks):
         w_i = i
@@ -404,28 +426,29 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
             # calc portfolio string
             _s_longs = ""
             _s_shorts = ""
-            idx = 0
-            for _stock_idx in _l_stocks:
-                if _s_longs != "":
+            if not GRID_SEARCH:
+                idx = 0
+                for _stock_idx in _l_stocks:
+                    if _s_longs != "":
+                        _s_longs += " "
+                    _s_longs += tickers[_stock_idx]
                     _s_longs += " "
-                _s_longs += tickers[_stock_idx]
-                _s_longs += " "
-                _s_longs += str(_l_s_hpr[idx])
-                # _s_longs += " "
-                # dt_ext = datetime.datetime.fromtimestamp(raw_dt[_t_w_eods[_s_l_ext_idx[idx]]])
-                # _s_longs += dt_ext.strftime('%Y-%m-%d')
-                idx += 1
-            idx = 0
-            for _stock_idx in _s_stocks:
-                if _s_shorts != "":
+                    _s_longs += "%.2f%%" % (_l_s_hpr[idx] * 100.0)
+                    _s_longs += " "
+                    dt_ext = datetime.datetime.fromtimestamp(raw_dt[_t_w_eods[_s_l_ext_idx[idx]]])
+                    _s_longs += dt_ext.strftime('%Y-%m-%d')
+                    idx += 1
+                idx = 0
+                for _stock_idx in _s_stocks:
+                    if _s_shorts != "":
+                        _s_shorts += " "
+                    _s_shorts += tickers[_stock_idx]
                     _s_shorts += " "
-                _s_shorts += tickers[_stock_idx]
-                _s_shorts += " "
-                _s_shorts += str(_s_s_hpr[idx])
-                # _s_shorts += " "
-                # dt_ext = datetime.datetime.fromtimestamp(raw_dt[_t_w_eods[_s_s_ext_idx[idx]]])
-                # _s_shorts += dt_ext.strftime('%Y-%m-%d')
-                idx += 1
+                    _s_shorts += "%.2f%%" % (_s_s_hpr[idx] * 100.0)
+                    _s_shorts += " "
+                    dt_ext = datetime.datetime.fromtimestamp(raw_dt[_t_w_eods[_s_s_ext_idx[idx]]])
+                    _s_shorts += dt_ext.strftime('%Y-%m-%d')
+                    idx += 1
 
             # calc long and short stops
             _l_stops = np.sum(_s_l_stop)
@@ -457,10 +480,12 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
             _s_l_ext_hpr,
             _s_s_ext_hpr)
         model_no_sl_hpr[w_i] = _w_hpr
-        min_w_eod_hpr[w_i] = _min_w_eod_hpr
-        min_w_lb_hpr[w_i] = _min_w_lb_hpr
-        l_port[w_i] = _s_longs
-        s_port[w_i] = _s_shorts
+        min_w_eod_hpr_no_sl[w_i] = _min_w_eod_hpr
+        min_w_lb_hpr_no_sl[w_i] = _min_w_lb_hpr
+        l_port_no_sl[w_i] = _s_longs
+        s_port_no_sl[w_i] = _s_shorts
+        l_stops_no_sl[w_i] = _l_stops
+        s_stops_no_sl[w_i] = _s_stops
 
         # calc eod model
         _t_w_l_s_hpr_mean = np.mean(_t_w_l_s_hpr, axis=0)
@@ -495,6 +520,12 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
             _s_s_ext_hpr)
 
         model_eod_sl_hpr[w_i] = _w_hpr
+        min_w_eod_hpr_eod_sl[w_i] = _min_w_eod_hpr
+        min_w_lb_hpr_eod_sl[w_i] = _min_w_lb_hpr
+        l_port_eod_sl[w_i] = _s_longs
+        s_port_eod_sl[w_i] = _s_shorts
+        l_stops_eod_sl[w_i] = _l_stops
+        s_stops_eod_sl[w_i] = _s_stops
 
         # calc lower bound hpr
         _t_w_l_s_lb_hpr_mean = np.mean(_t_w_l_s_lb_hpr, axis=0)
@@ -534,6 +565,12 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
             _s_s_ext_hpr)
 
         model_lb_sl_hpr[w_i] = _w_hpr
+        min_w_eod_hpr_lb_sl[w_i] = _min_w_eod_hpr
+        min_w_lb_hpr_lb_sl[w_i] = _min_w_lb_hpr
+        l_port_lb_sl[w_i] = _s_longs
+        s_port_lb_sl[w_i] = _s_shorts
+        l_stops_lb_sl[w_i] = _l_stops
+        s_stops_lb_sl[w_i] = _s_stops
 
         # calc sl by stock model
         def first_true_idx_by_row(mask, default_idx):
@@ -572,22 +609,32 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
             _s_l_ext_hpr,
             _s_s_ext_hpr)
         model_s_sl_hpr[w_i] = _w_hpr
+        min_w_eod_hpr_s_sl[w_i] = _min_w_eod_hpr
+        min_w_lb_hpr_s_sl[w_i] = _min_w_lb_hpr
+        l_port_s_sl[w_i] = _s_longs
+        s_port_s_sl[w_i] = _s_shorts
+        l_stops_s_sl[w_i] = _l_stops
+        s_stops_s_sl[w_i] = _s_stops
+
+        model_no_sl = (
+            model_no_sl_hpr, min_w_eod_hpr_no_sl, min_w_lb_hpr_no_sl, l_stops_no_sl, s_stops_no_sl, l_port_no_sl,
+            s_port_no_sl)
+        model_eod_sl = (
+            model_eod_sl_hpr, min_w_eod_hpr_eod_sl, min_w_lb_hpr_eod_sl, l_stops_eod_sl, s_stops_eod_sl, l_port_eod_sl,
+            s_port_eod_sl)
+        model_lb_sl = (
+            model_lb_sl_hpr, min_w_eod_hpr_lb_sl, min_w_lb_hpr_lb_sl, l_stops_lb_sl, s_stops_lb_sl, l_port_lb_sl,
+            s_port_lb_sl)
+        model_s_sl = (
+            model_s_sl_hpr, min_w_eod_hpr_s_sl, min_w_lb_hpr_s_sl, l_stops_s_sl, s_stops_s_sl, l_port_s_sl, s_port_s_sl)
 
     return c_l, \
            c_s, \
-           model_no_sl_hpr, \
-           model_eod_sl_hpr, \
-           model_lb_sl_hpr, \
-           model_s_sl_hpr, \
-           min_w_eod_hpr, \
-           min_w_lb_hpr, \
-           l_port, \
-           s_port
+           model_no_sl, \
+           model_eod_sl, \
+           model_lb_sl, \
+           model_s_sl
 
-
-e_c_l, e_c_s, e_model_no_sl_hpr, e_model_eod_sl_hpr, e_model_lb_sl_hpr, e_model_s_sl_hpr, e_min_w_hpr, e_min_w_lb_hpr, l_port, s_port = calc_classes_and_decisions(
-    data_set_records, total_weeks, prob_l
-)
 
 if GRID_SEARCH:
     with open('./data/grid_search.csv', 'w', newline='') as f:
@@ -615,11 +662,14 @@ if GRID_SEARCH:
 
 
         def print_rows_for_fixed_params():
-            e_c_l, e_c_s, e_model_no_sl_hpr, e_model_eod_sl_hpr, e_model_lb_sl_hpr, e_model_s_sl_hpr, e_min_w_hpr, e_min_w_lb_hpr, l_port, s_port = calc_classes_and_decisions(
+            # e_c_l, e_c_s, e_model_no_sl_hpr, e_model_eod_sl_hpr, e_model_lb_sl_hpr, e_model_s_sl_hpr, e_min_w_hpr, e_min_w_lb_hpr, l_port, s_port = calc_classes_and_decisions(
+            #     data_set_records, total_weeks, prob_l
+            # )
+            model_c_l, model_c_s, model_no_sl, model_eod_sl, model_lb_sl, model_s_sl = calc_classes_and_decisions(
                 data_set_records, total_weeks, prob_l
             )
 
-            def print_row(model_hpr, sl_type):
+            def print_row(model_hpr, sl_name):
                 wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(model_hpr[train_weeks:],
                                                                                          w_enter_index[train_weeks:],
                                                                                          raw_dt[train_weeks:])
@@ -631,7 +681,7 @@ if GRID_SEARCH:
 
                 writer.writerow(
                     (
-                        sl_type,
+                        sl_name,
                         STOP_LOSS_HPR,
                         SLCT_VAL,
                         'pct' if SLCT_TYPE == SelectionType.PCT else 'fixed',
@@ -663,28 +713,33 @@ if GRID_SEARCH:
                 print_rows_for_fixed_params()
 
 else:
+    model_c_l, model_c_s, model_no_sl, model_eod_sl, model_lb_sl, model_s_sl = calc_classes_and_decisions(
+        data_set_records, total_weeks, prob_l
+    )
+
     confusion_matrix(c_l[train_records:],
                      c_s[train_records:],
-                     e_c_l[train_records:],
-                     e_c_s[train_records:])
+                     model_c_l[train_records:],
+                     model_c_s[train_records:])
 
     type_to_idx = {
-        StopLossType.NO: e_model_no_sl_hpr,
-        StopLossType.EOD: e_model_eod_sl_hpr,
-        StopLossType.LB: e_model_lb_sl_hpr,
-        StopLossType.STOCK: e_model_s_sl_hpr
+        StopLossType.NO: model_no_sl,
+        StopLossType.EOD: model_eod_sl,
+        StopLossType.LB: model_lb_sl,
+        StopLossType.STOCK: model_s_sl
     }
 
-    e_model_hpr = type_to_idx.get(STOP_LOSS_TYPE, e_model_no_sl_hpr)
+    model = type_to_idx.get(STOP_LOSS_TYPE, model_no_sl)
+    model_hpr, model_min_w_eod_hpr, model_min_w_lb_hpr, model_l_stops, model_s_stops, model_l_port, model_s_port = model
 
-    wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(e_model_hpr[train_weeks:],
+    wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(model_hpr[train_weeks:],
                                                                              w_enter_index[train_weeks:],
                                                                              raw_dt[train_weeks:])
 
     yr_avg = np.mean(yr)
-    w_dd = np.min(e_model_hpr)
-    w_avg = np.mean(e_model_hpr)
-    w_best = np.max(e_model_hpr)
+    w_dd = np.min(model_hpr)
+    w_avg = np.mean(model_hpr)
+    w_best = np.max(model_hpr)
 
     print(
         "F: {:.2f} DD: {:.2f} W_DD: {:.2f} W_AVG: {:.2f} W_BEST: {:.2f} SHARPE: {:.2f} AVG_YEAR: {:.2f} F_R: {:.2f} DD_R: {:.2f}".format(
@@ -710,16 +765,37 @@ else:
                  w_exit_index,
                  raw_mpl_dt)
 
-    wealth_csv(e_model_no_sl_hpr[train_weeks:],
-               e_model_eod_sl_hpr[train_weeks:],
-               e_model_lb_sl_hpr[train_weeks:],
-               e_model_s_sl_hpr[train_weeks:],
-               e_min_w_hpr[train_weeks:],
-               e_min_w_lb_hpr[train_weeks:],
-               w_enter_index[train_weeks:],
-               w_exit_index[train_weeks:],
+    wealth_csv("no",
+               train_weeks,
+               total_weeks,
+               w_enter_index,
+               w_exit_index,
                raw_dt,
-               l_port[train_weeks:],
-               s_port[train_weeks:])
+               model_no_sl
+               )
+    wealth_csv("eod",
+               train_weeks,
+               total_weeks,
+               w_enter_index,
+               w_exit_index,
+               raw_dt,
+               model_eod_sl
+               )
+    wealth_csv("lb",
+               train_weeks,
+               total_weeks,
+               w_enter_index,
+               w_exit_index,
+               raw_dt,
+               model_lb_sl
+               )
+    wealth_csv("stk",
+               train_weeks,
+               total_weeks,
+               w_enter_index,
+               w_exit_index,
+               raw_dt,
+               model_s_sl
+               )
 
     plt.show(True)
