@@ -56,27 +56,27 @@ def plot_traded_stocks_per_day(traded_stocks, raw_mpl_dt):
 #     ax.plot_date(raw_mpl_dt, g, fmt='o')
 
 
-def hpr_analysis(t_hpr, b_hpr):
-    d_hpr = t_hpr - b_hpr
-    t_hpr_mean = np.mean(t_hpr)
-    b_hpr_mean = np.mean(b_hpr)
-    d_hpr_mean = np.mean(d_hpr)
-
-    t_t, p_t = stats.ttest_1samp(t_hpr, t_hpr_mean)
-    t_b, p_b = stats.ttest_1samp(b_hpr, b_hpr_mean)
-    t_d, p_d = stats.ttest_1samp(d_hpr, d_hpr_mean)
-    print(
-        "T: {:.4f} t-stat: {:.2f} p: {:.2f} B: {:.4f} t-stat: {:.2f} p: {:.2f} D: {:.4f} t-stat: {:.2f} p: {:.2f}".format(
-            t_hpr_mean,
-            t_t,
-            p_t,
-            b_hpr_mean,
-            t_b,
-            p_b,
-            d_hpr_mean,
-            t_d,
-            p_d
-        ))
+# def hpr_analysis(t_hpr, b_hpr):
+#     d_hpr = t_hpr - b_hpr
+#     t_hpr_mean = np.mean(t_hpr)
+#     b_hpr_mean = np.mean(b_hpr)
+#     d_hpr_mean = np.mean(d_hpr)
+#
+#     t_t, p_t = stats.ttest_1samp(t_hpr, t_hpr_mean)
+#     t_b, p_b = stats.ttest_1samp(b_hpr, b_hpr_mean)
+#     t_d, p_d = stats.ttest_1samp(d_hpr, d_hpr_mean)
+#     print(
+#         "T: {:.4f} t-stat: {:.2f} p: {:.2f} B: {:.4f} t-stat: {:.2f} p: {:.2f} D: {:.4f} t-stat: {:.2f} p: {:.2f}".format(
+#             t_hpr_mean,
+#             t_t,
+#             p_t,
+#             b_hpr_mean,
+#             t_b,
+#             p_b,
+#             d_hpr_mean,
+#             t_d,
+#             p_d
+#         ))
 
 
 def confusion_matrix(a_l, a_s, p_l, p_s):
@@ -215,8 +215,6 @@ def wealth_csv(model_no_sl_hpr,
                model_eod_sl_hpr,
                model_lb_sl_hpr,
                model_s_sl_hpr,
-               t_hpr,
-               b_hpr,
                min_w_hpr,
                min_w_lb_hpr,
                w_enter_index,
@@ -234,8 +232,6 @@ def wealth_csv(model_no_sl_hpr,
                 'beg',
                 'end',
                 'wealth',
-                'long stocks ret',
-                'short stocks ret',
                 'no sl',
                 'eod sl',
                 'lb sl',
@@ -250,8 +246,6 @@ def wealth_csv(model_no_sl_hpr,
                 (dt_enter.strftime('%Y-%m-%d'),
                  dt_exit.strftime('%Y-%m-%d'),
                  wealth[w],
-                 t_hpr[w],
-                 b_hpr[w],
                  model_no_sl_hpr[w],
                  model_eod_sl_hpr[w],
                  model_lb_sl_hpr[w],

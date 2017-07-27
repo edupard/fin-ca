@@ -9,7 +9,7 @@ from data_utils import filter_activelly_tradeable_stocks, convert_to_mpl_time, g
     get_one_trading_date, get_dates_for_weekly_return, get_tradable_stock_indexes, get_prices, \
     PxType, calc_z_score, get_tradable_stocks_mask, get_intermediate_dates
 from download_utils import load_npz_data, load_npz_data_alt
-from visualization import wealth_graph, confusion_matrix, hpr_analysis, wealth_csv, calc_wealth
+from visualization import wealth_graph, confusion_matrix, wealth_csv, calc_wealth
 from visualization import plot_20_random_stock_prices, plot_traded_stocks_per_day
 from nn import train_ae, train_ffnn, train_rbm, evaluate_ffnn
 from date_range import HIST_BEG, HIST_END
@@ -265,10 +265,6 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
     s_l = np.zeros((data_set_records), dtype=np.bool)
     s_s = np.zeros((data_set_records), dtype=np.bool)
 
-    top_hpr = np.zeros((total_weeks))
-    bottom_hpr = np.zeros((total_weeks))
-    model_hpr = np.zeros((total_weeks))
-
     model_no_sl_hpr = np.zeros((total_weeks))
     model_eod_sl_hpr = np.zeros((total_weeks))
     model_lb_sl_hpr = np.zeros((total_weeks))
@@ -338,17 +334,6 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         sel_s_cond = _s_s_s
         sel_s_cond &= _int_r <= s_int_r_t_b
         sel_s_cond &= _int_r >= s_int_r_b_b
-
-        # calc stocks hpr
-        _s_hpr_model = s_hpr_model[beg: end]
-        l_s_hpr = _s_hpr_model[sel_l_cond]
-        s_s_hpr = _s_hpr_model[sel_s_cond]
-        # calc portfolio hpr
-        l_hpr = np.mean(l_s_hpr)
-        s_hpr = np.mean(s_s_hpr)
-        top_hpr[w_i] = l_hpr
-        bottom_hpr[w_i] = s_hpr
-        w_hpr = (l_hpr - s_hpr) / 2
 
         # select long and short stocks in portfolio
         _stocks = stocks[beg:end]
@@ -426,9 +411,9 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
                 _s_longs += tickers[_stock_idx]
                 _s_longs += " "
                 _s_longs += str(_l_s_hpr[idx])
-                _s_longs += " "
-                dt_ext = datetime.datetime.fromtimestamp(raw_dt[_t_w_eods[_s_l_ext_idx[idx]]])
-                _s_longs += dt_ext.strftime('%Y-%m-%d')
+                # _s_longs += " "
+                # dt_ext = datetime.datetime.fromtimestamp(raw_dt[_t_w_eods[_s_l_ext_idx[idx]]])
+                # _s_longs += dt_ext.strftime('%Y-%m-%d')
                 idx += 1
             idx = 0
             for _stock_idx in _s_stocks:
@@ -437,9 +422,9 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
                 _s_shorts += tickers[_stock_idx]
                 _s_shorts += " "
                 _s_shorts += str(_s_s_hpr[idx])
-                _s_shorts += " "
-                dt_ext = datetime.datetime.fromtimestamp(raw_dt[_t_w_eods[_s_s_ext_idx[idx]]])
-                _s_shorts += dt_ext.strftime('%Y-%m-%d')
+                # _s_shorts += " "
+                # dt_ext = datetime.datetime.fromtimestamp(raw_dt[_t_w_eods[_s_s_ext_idx[idx]]])
+                # _s_shorts += dt_ext.strftime('%Y-%m-%d')
                 idx += 1
 
             # calc long and short stops
@@ -588,10 +573,19 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
             _s_s_ext_hpr)
         model_s_sl_hpr[w_i] = _w_hpr
 
-    return c_l, c_s, model_no_sl_hpr, model_eod_sl_hpr, model_lb_sl_hpr, model_s_sl_hpr, top_hpr, bottom_hpr, min_w_eod_hpr, min_w_lb_hpr, l_port, s_port
+    return c_l, \
+           c_s, \
+           model_no_sl_hpr, \
+           model_eod_sl_hpr, \
+           model_lb_sl_hpr, \
+           model_s_sl_hpr, \
+           min_w_eod_hpr, \
+           min_w_lb_hpr, \
+           l_port, \
+           s_port
 
 
-e_c_l, e_c_s, e_model_no_sl_hpr, e_model_eod_sl_hpr, e_model_lb_sl_hpr, e_model_s_sl_hpr, e_t_hpr, e_b_hpr, e_min_w_hpr, e_min_w_lb_hpr, l_port, s_port = calc_classes_and_decisions(
+e_c_l, e_c_s, e_model_no_sl_hpr, e_model_eod_sl_hpr, e_model_lb_sl_hpr, e_model_s_sl_hpr, e_min_w_hpr, e_min_w_lb_hpr, l_port, s_port = calc_classes_and_decisions(
     data_set_records, total_weeks, prob_l
 )
 
@@ -621,7 +615,7 @@ if GRID_SEARCH:
 
 
         def print_rows_for_fixed_params():
-            e_c_l, e_c_s, e_model_no_sl_hpr, e_model_eod_sl_hpr, e_model_lb_sl_hpr, e_model_s_sl_hpr, e_t_hpr, e_b_hpr, e_min_w_hpr, e_min_w_lb_hpr, l_port, s_port = calc_classes_and_decisions(
+            e_c_l, e_c_s, e_model_no_sl_hpr, e_model_eod_sl_hpr, e_model_lb_sl_hpr, e_model_s_sl_hpr, e_min_w_hpr, e_min_w_lb_hpr, l_port, s_port = calc_classes_and_decisions(
                 data_set_records, total_weeks, prob_l
             )
 
@@ -673,8 +667,6 @@ else:
                      c_s[train_records:],
                      e_c_l[train_records:],
                      e_c_s[train_records:])
-    hpr_analysis(e_t_hpr[train_weeks:],
-                 e_b_hpr[train_weeks:])
 
     type_to_idx = {
         StopLossType.NO: e_model_no_sl_hpr,
@@ -722,8 +714,6 @@ else:
                e_model_eod_sl_hpr[train_weeks:],
                e_model_lb_sl_hpr[train_weeks:],
                e_model_s_sl_hpr[train_weeks:],
-               e_t_hpr[train_weeks:],
-               e_b_hpr[train_weeks:],
                e_min_w_hpr[train_weeks:],
                e_min_w_lb_hpr[train_weeks:],
                w_enter_index[train_weeks:],
