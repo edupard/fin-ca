@@ -37,6 +37,7 @@ class Writer:
         print('downloading data...')
         with open(self.FILE_NAME, 'w', newline='') as f:
             writer = csv.writer(f)
+            writer.writerow(('ticker', 'date', 'o', 'c', 'h', 'l', 'v', 'adj_o', 'adj_c', 'adj_h', 'adj_l', 'div', 'split'))
             while True:
                 p = self.queue.get()
                 if p.payload_type == PayloadType.TASK_COMPLETED:
@@ -202,6 +203,8 @@ def preprocess_data_alt(tickers, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME
         reader = csv.reader(csvfile)
         for row in reader:
             line += 1
+            if line == 1:
+                continue
 
             progress = line // (num_lines // 10)
             if progress != curr_progress:

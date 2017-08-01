@@ -15,32 +15,20 @@ PERCENTILE = 10
 
 TODAY = datetime.datetime.today().date()
 
-USE_ADJ_PX = False
+USE_ADJ_PX = True
 # YYYY-MM-DD
-# PREDICTION_DATE = datetime.datetime.strptime('2017-06-23', '%Y-%m-%d').date()
-# OPEN_POS_DATE = datetime.datetime.strptime('2017-06-26', '%Y-%m-%d').date()
-# HPR_DATE = datetime.datetime.strptime('2017-06-30', '%Y-%m-%d').date()
-# PREDICTION_DATE = datetime.datetime.strptime('2017-06-30', '%Y-%m-%d').date()
-# OPEN_POS_DATE = datetime.datetime.strptime('2017-07-03', '%Y-%m-%d').date()
-# HPR_DATE = datetime.datetime.strptime('2017-07-07', '%Y-%m-%d').date()
-# PREDICTION_DATE = datetime.datetime.strptime('2017-07-07', '%Y-%m-%d').date()
-# OPEN_POS_DATE = datetime.datetime.strptime('2017-07-10', '%Y-%m-%d').date()
-# HPR_DATE = datetime.datetime.strptime('2017-07-14', '%Y-%m-%d').date()
-PREDICTION_DATE = datetime.datetime.strptime('2017-07-14', '%Y-%m-%d').date()
-OPEN_POS_DATE = datetime.datetime.strptime('2017-07-14', '%Y-%m-%d').date()
-HPR_DATE = datetime.datetime.strptime('2017-07-14', '%Y-%m-%d').date()
+PREDICTION_DATE = datetime.datetime.strptime('2017-07-21', '%Y-%m-%d').date()
+OPEN_POS_DATE = datetime.datetime.strptime('2017-07-21', '%Y-%m-%d').date()
+HPR_DATE = datetime.datetime.strptime('2017-07-28', '%Y-%m-%d').date()
 
 
 START_DATE = PREDICTION_DATE - datetime.timedelta(days=(NUM_WEEKS + 2) * 7)
 END_DATE = HPR_DATE
 
-SUFFIX = ''
-if USE_ADJ_PX:
-    SUFFIX = '_adj'
 tickers = get_nasdaq_tickers()
-# download_data(tickers, 'data/history{}.csv'.format(SUFFIX), START_DATE, END_DATE, 50)
-preprocess_data_alt(tickers, 'data/history{}.csv'.format(SUFFIX), START_DATE, END_DATE, 'data/history{}.npz'.format(SUFFIX), USE_ADJ_PX)
-tickers, raw_dt, raw_data = load_npz_data_alt('data/history{}.npz'.format(SUFFIX))
+download_data(tickers, 'data/history.csv', START_DATE, END_DATE, 50)
+preprocess_data_alt(tickers, 'data/history.csv', START_DATE, END_DATE, 'data/history.npz', USE_ADJ_PX)
+tickers, raw_dt, raw_data = load_npz_data_alt('data/history.npz')
 
 mask, traded_stocks = filter_activelly_tradeable_stocks(raw_data)
 
@@ -54,117 +42,117 @@ dr, d_r, d_c_r, d_r_m, d_r_std = calc_z_score_alt(d_c)
 # wr = calc_z_score(w_c)
 wr, w_r, w_c_r, w_r_m, w_r_std = calc_z_score_alt(w_c)
 
-with open('data/prediction_px{}.csv'.format(SUFFIX), 'w', newline='') as f:
-    writer = csv.writer(f)
-
-    row = ['ticker']
-    for dt_idx in w_r_i:
-        dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
-        row.append(dt.strftime('%Y-%m-%d'))
-    for dt_idx in d_r_i:
-        dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
-        row.append(dt.strftime('%Y-%m-%d'))
-    writer.writerow(row)
-
-    idx = 0
-    for ticker_idx in t_s_i:
-        ticker = tickers[ticker_idx]
-        row = []
-        row.append(ticker)
-        for v in w_c[idx,:]:
-            row.append(v)
-        for v in d_c[idx,:]:
-            row.append(v)
-        writer.writerow(row)
-        idx += 1
-
-with open('data/prediction_r{}.csv'.format(SUFFIX), 'w', newline='') as f:
-    writer = csv.writer(f)
-
-    row = ['ticker']
-    for dt_idx in w_r_i[1:]:
-        dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
-        row.append(dt.strftime('%Y-%m-%d'))
-    for dt_idx in d_r_i[1:]:
-        dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
-        row.append(dt.strftime('%Y-%m-%d'))
-    writer.writerow(row)
-
-    idx = 0
-    for ticker_idx in t_s_i:
-        ticker = tickers[ticker_idx]
-        row = []
-        row.append(ticker)
-        for v in w_r[idx,:]:
-            row.append(v)
-        for v in d_r[idx,:]:
-            row.append(v)
-        writer.writerow(row)
-        idx += 1
-
-
-with open('data/prediction_c_r{}.csv'.format(SUFFIX), 'w', newline='') as f:
-    writer = csv.writer(f)
-
-    row = ['ticker']
-    for dt_idx in w_r_i[1:]:
-        dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
-        row.append(dt.strftime('%Y-%m-%d'))
-    for dt_idx in d_r_i[1:]:
-        dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
-        row.append(dt.strftime('%Y-%m-%d'))
-    writer.writerow(row)
-
-    idx = 0
-    for ticker_idx in t_s_i:
-        ticker = tickers[ticker_idx]
-        row = []
-        row.append(ticker)
-        for v in w_c_r[idx,:]:
-            row.append(v)
-        for v in d_c_r[idx,:]:
-            row.append(v)
-        writer.writerow(row)
-        idx += 1
-
-    row = ['MEAN']
-    for v in w_r_m[:]:
-        row.append(v)
-    for v in d_r_m[:]:
-        row.append(v)
-    writer.writerow(row)
-
-    row = ['STDDEV']
-    for v in w_r_std[:]:
-        row.append(v)
-    for v in d_r_std[:]:
-        row.append(v)
-    writer.writerow(row)
-
-
-with open('data/prediction_z{}.csv'.format(SUFFIX), 'w', newline='') as f:
-    writer = csv.writer(f)
-
-    row = ['ticker']
-    for dt_idx in w_r_i[1:]:
-        dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
-        row.append(dt.strftime('%Y-%m-%d'))
-    for dt_idx in d_r_i[1:]:
-        dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
-        row.append(dt.strftime('%Y-%m-%d'))
-    writer.writerow(row)
-
-    idx = 0
-    for ticker_idx in t_s_i:
-        ticker = tickers[ticker_idx]
-        row = []
-        row.append(ticker)
-        for v in wr[idx,:]:
-            row.append(v)
-        for v in dr[idx,:]:
-            row.append(v)
-        writer.writerow(row)
-        idx += 1
+# with open('data/prediction_px.csv', 'w', newline='') as f:
+#     writer = csv.writer(f)
+#
+#     row = ['ticker']
+#     for dt_idx in w_r_i:
+#         dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
+#         row.append(dt.strftime('%Y-%m-%d'))
+#     for dt_idx in d_r_i:
+#         dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
+#         row.append(dt.strftime('%Y-%m-%d'))
+#     writer.writerow(row)
+#
+#     idx = 0
+#     for ticker_idx in t_s_i:
+#         ticker = tickers[ticker_idx]
+#         row = []
+#         row.append(ticker)
+#         for v in w_c[idx,:]:
+#             row.append(v)
+#         for v in d_c[idx,:]:
+#             row.append(v)
+#         writer.writerow(row)
+#         idx += 1
+#
+# with open('data/prediction_r.csv', 'w', newline='') as f:
+#     writer = csv.writer(f)
+#
+#     row = ['ticker']
+#     for dt_idx in w_r_i[1:]:
+#         dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
+#         row.append(dt.strftime('%Y-%m-%d'))
+#     for dt_idx in d_r_i[1:]:
+#         dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
+#         row.append(dt.strftime('%Y-%m-%d'))
+#     writer.writerow(row)
+#
+#     idx = 0
+#     for ticker_idx in t_s_i:
+#         ticker = tickers[ticker_idx]
+#         row = []
+#         row.append(ticker)
+#         for v in w_r[idx,:]:
+#             row.append(v)
+#         for v in d_r[idx,:]:
+#             row.append(v)
+#         writer.writerow(row)
+#         idx += 1
+#
+#
+# with open('data/prediction_c_r.csv', 'w', newline='') as f:
+#     writer = csv.writer(f)
+#
+#     row = ['ticker']
+#     for dt_idx in w_r_i[1:]:
+#         dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
+#         row.append(dt.strftime('%Y-%m-%d'))
+#     for dt_idx in d_r_i[1:]:
+#         dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
+#         row.append(dt.strftime('%Y-%m-%d'))
+#     writer.writerow(row)
+#
+#     idx = 0
+#     for ticker_idx in t_s_i:
+#         ticker = tickers[ticker_idx]
+#         row = []
+#         row.append(ticker)
+#         for v in w_c_r[idx,:]:
+#             row.append(v)
+#         for v in d_c_r[idx,:]:
+#             row.append(v)
+#         writer.writerow(row)
+#         idx += 1
+#
+#     row = ['MEAN']
+#     for v in w_r_m[:]:
+#         row.append(v)
+#     for v in d_r_m[:]:
+#         row.append(v)
+#     writer.writerow(row)
+#
+#     row = ['STDDEV']
+#     for v in w_r_std[:]:
+#         row.append(v)
+#     for v in d_r_std[:]:
+#         row.append(v)
+#     writer.writerow(row)
+#
+#
+# with open('data/prediction_z.csv', 'w', newline='') as f:
+#     writer = csv.writer(f)
+#
+#     row = ['ticker']
+#     for dt_idx in w_r_i[1:]:
+#         dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
+#         row.append(dt.strftime('%Y-%m-%d'))
+#     for dt_idx in d_r_i[1:]:
+#         dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
+#         row.append(dt.strftime('%Y-%m-%d'))
+#     writer.writerow(row)
+#
+#     idx = 0
+#     for ticker_idx in t_s_i:
+#         ticker = tickers[ticker_idx]
+#         row = []
+#         row.append(ticker)
+#         for v in wr[idx,:]:
+#             row.append(v)
+#         for v in dr[idx,:]:
+#             row.append(v)
+#         writer.writerow(row)
+#         idx += 1
 
 
 
@@ -199,7 +187,7 @@ CSV_HPR_DATE = get_csv_date_string(HPR_DATE_IDX)
 CSV_OPEN_POS_DATE = get_csv_date_string(OPEN_POS_DATE_IDX)
 
 
-with open('./data/prediction{}.csv'.format(SUFFIX), 'w', newline='') as f:
+with open('./data/prediction.csv', 'w', newline='') as f:
     writer = csv.writer(f)
     writer.writerow(
         ('ticker', 'long prob', 'class', '1w', '1d', '*', '#', 'hp', '1w px', '1d px', '* px', '# px', 'hp px', '1wr pct', '1dr pct',

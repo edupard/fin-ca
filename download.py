@@ -7,8 +7,11 @@ import datetime
 # END = datetime.datetime.strptime('2017-07-07', '%Y-%m-%d').date()
 # BEG = datetime.datetime.strptime('2017-07-08', '%Y-%m-%d').date()
 # END = datetime.datetime.strptime('2017-07-16', '%Y-%m-%d').date()
-BEG = datetime.datetime.strptime('2017-07-17', '%Y-%m-%d').date()
-END = datetime.datetime.strptime('2017-07-23', '%Y-%m-%d').date()
+# BEG = datetime.datetime.strptime('2017-07-24', '%Y-%m-%d').date()
+# END = datetime.datetime.strptime('2017-07-30', '%Y-%m-%d').date()
+BEG = HIST_BEG
+END = HIST_END
 
 tickers = get_nyse_nasdaq_tickers()
-download_data(tickers, 'data/prices_append.csv', BEG, END)
+# tickers = ['AAPL']
+download_data(tickers, 'data/prices_right.csv', BEG, END)

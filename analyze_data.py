@@ -542,10 +542,10 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _s_l_ext_idx = np.full(_l_stocks.shape, _ext_idx)
         _s_s_ext_idx = np.full(_s_stocks.shape, _ext_idx)
         _s_l_stop = np.full(_l_stocks.shape, _stop)
-        _s_s_stop = np.full(_l_stocks.shape, _stop)
+        _s_s_stop = np.full(_s_stocks.shape, _stop)
         if _stop:
             _s_l_ext_hpr = np.full(_l_stocks.shape, STOP_LOSS_HPR)
-            _s_s_ext_hpr = np.full(_l_stocks.shape, -STOP_LOSS_HPR)
+            _s_s_ext_hpr = np.full(_s_stocks.shape, -STOP_LOSS_HPR)
         else:
             _s_l_ext_hpr = _t_w_l_s_hpr[:, _ext_idx]
             _s_s_ext_hpr = _t_w_s_s_hpr[:, _ext_idx]
@@ -646,7 +646,9 @@ if GRID_SEARCH:
                 'selection',
                 'type',
                 'wealth',
-                'max dd',
+                'min w eod',
+                'min w lb',
+                'dd',
                 'w dd',
                 'w avg',
                 'w best',
@@ -662,14 +664,14 @@ if GRID_SEARCH:
 
 
         def print_rows_for_fixed_params():
-            # e_c_l, e_c_s, e_model_no_sl_hpr, e_model_eod_sl_hpr, e_model_lb_sl_hpr, e_model_s_sl_hpr, e_min_w_hpr, e_min_w_lb_hpr, l_port, s_port = calc_classes_and_decisions(
-            #     data_set_records, total_weeks, prob_l
-            # )
+
             model_c_l, model_c_s, model_no_sl, model_eod_sl, model_lb_sl, model_s_sl = calc_classes_and_decisions(
                 data_set_records, total_weeks, prob_l
             )
 
-            def print_row(model_hpr, sl_name):
+            def print_row(model, sl_name):
+                model_hpr, model_min_w_eod_hpr, model_min_w_lb_hpr, model_l_stops, model_s_stops, model_l_port, model_s_port = model
+
                 wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(model_hpr[train_weeks:],
                                                                                          w_enter_index[train_weeks:],
                                                                                          raw_dt[train_weeks:])
@@ -679,37 +681,42 @@ if GRID_SEARCH:
                 w_avg = np.mean(model_hpr)
                 w_best = np.max(model_hpr)
 
+                min_min_w_eod = np.min(model_min_w_eod_hpr)
+                min_min_w_lb = np.min(model_min_w_lb_hpr)
+
                 writer.writerow(
                     (
                         sl_name,
-                        STOP_LOSS_HPR,
+                        "%.2f%%" % (STOP_LOSS_HPR * 100.0),
                         SLCT_VAL,
                         'pct' if SLCT_TYPE == SelectionType.PCT else 'fixed',
                         wealth[-1],
-                        dd,
-                        w_dd,
-                        w_avg,
-                        w_best,
+                        "%.2f%%" % (min_min_w_eod * 100.0),
+                        "%.2f%%" % (min_min_w_lb * 100.0),
+                        "%.2f%%" % (dd * 100.0),
+                        "%.2f%%" % (w_dd * 100.0),
+                        "%.2f%%" % (w_avg * 100.0),
+                        "%.2f%%" % (w_best * 100.0),
                         sharpe,
-                        yr_avg,
+                        "%.2f%%" % (yr_avg * 100.0),
                         rc_wealth[-1],
-                        rc_dd
+                        "%.2f%%" % (rc_dd * 100.0)
                     ))
 
-            print_row(e_model_no_sl_hpr, 'no')
-            print_row(e_model_eod_sl_hpr, 'eod')
-            print_row(e_model_lb_sl_hpr, 'lower bound')
-            print_row(e_model_s_sl_hpr, 'stock')
+            print_row(model_no_sl, 'no')
+            print_row(model_eod_sl, 'eod')
+            print_row(model_lb_sl, 'lower bound')
+            print_row(model_s_sl, 'stock')
 
 
         # grid search
         SLCT_TYPE = SelectionType.FIXED
         for SLCT_VAL in range(1, 16):
-            for STOP_LOSS_HPR in np.linspace(-0.01, -0.40, 39 * 2 + 1):
+            for STOP_LOSS_HPR in np.linspace(-0.01, -0.50, 49 * 2 + 1):
                 print_rows_for_fixed_params()
         SLCT_TYPE = SelectionType.PCT
-        for SLCT_VAL in np.linspace(0.5, 15, 30):
-            for STOP_LOSS_HPR in np.linspace(-0.01, -0.40, 39 * 2 + 1):
+        for SLCT_VAL in np.linspace(0.5, 15, 15 * 2):
+            for STOP_LOSS_HPR in np.linspace(-0.01, -0.50, 49 * 2 + 1):
                 print_rows_for_fixed_params()
 
 else:

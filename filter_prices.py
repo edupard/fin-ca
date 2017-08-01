@@ -2,13 +2,17 @@ import csv
 import datetime
 
 from tickers import get_nyse_nasdaq_tickers, get_nyse_tickers, get_nasdaq_tickers
+from date_range import HIST_BEG, HIST_END
 
 DATE_BEG = datetime.datetime.strptime('2010-03-18', '%Y-%m-%d').date()
 DATE_END = datetime.datetime.strptime('2010-03-26', '%Y-%m-%d').date()
-tickers = ['CTIC']
+tickers = ['GOOG']
 
 # DATE_BEG = datetime.datetime.strptime('2017-03-24', '%Y-%m-%d').date()
 # DATE_END = datetime.datetime.strptime('2017-06-30', '%Y-%m-%d').date()
+DATE_BEG = HIST_BEG
+DATE_END = HIST_END
+
 # tickers = get_nasdaq_tickers()
 tickers_set = set(tickers)
 
