@@ -17,8 +17,8 @@ TODAY = datetime.datetime.today().date()
 
 USE_ADJ_PX = True
 # YYYY-MM-DD
-PREDICTION_DATE = datetime.datetime.strptime('2017-07-21', '%Y-%m-%d').date()
-OPEN_POS_DATE = datetime.datetime.strptime('2017-07-21', '%Y-%m-%d').date()
+PREDICTION_DATE = datetime.datetime.strptime('2017-07-28', '%Y-%m-%d').date()
+OPEN_POS_DATE = datetime.datetime.strptime('2017-07-28', '%Y-%m-%d').date()
 HPR_DATE = datetime.datetime.strptime('2017-07-28', '%Y-%m-%d').date()
 
 
@@ -26,8 +26,8 @@ START_DATE = PREDICTION_DATE - datetime.timedelta(days=(NUM_WEEKS + 2) * 7)
 END_DATE = HPR_DATE
 
 tickers = get_nasdaq_tickers()
-download_data(tickers, 'data/history.csv', START_DATE, END_DATE, 50)
-preprocess_data_alt(tickers, 'data/history.csv', START_DATE, END_DATE, 'data/history.npz', USE_ADJ_PX)
+# download_data(tickers, 'data/history.csv', START_DATE, END_DATE, 50)
+# preprocess_data_alt(tickers, 'data/history.csv', START_DATE, END_DATE, 'data/history.npz', USE_ADJ_PX)
 tickers, raw_dt, raw_data = load_npz_data_alt('data/history.npz')
 
 mask, traded_stocks = filter_activelly_tradeable_stocks(raw_data)
@@ -130,29 +130,29 @@ wr, w_r, w_c_r, w_r_m, w_r_std = calc_z_score_alt(w_c)
 #     writer.writerow(row)
 #
 #
-# with open('data/prediction_z.csv', 'w', newline='') as f:
-#     writer = csv.writer(f)
-#
-#     row = ['ticker']
-#     for dt_idx in w_r_i[1:]:
-#         dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
-#         row.append(dt.strftime('%Y-%m-%d'))
-#     for dt_idx in d_r_i[1:]:
-#         dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
-#         row.append(dt.strftime('%Y-%m-%d'))
-#     writer.writerow(row)
-#
-#     idx = 0
-#     for ticker_idx in t_s_i:
-#         ticker = tickers[ticker_idx]
-#         row = []
-#         row.append(ticker)
-#         for v in wr[idx,:]:
-#             row.append(v)
-#         for v in dr[idx,:]:
-#             row.append(v)
-#         writer.writerow(row)
-#         idx += 1
+with open('data/prediction_z.csv', 'w', newline='') as f:
+    writer = csv.writer(f)
+
+    row = ['ticker']
+    for dt_idx in w_r_i[1:]:
+        dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
+        row.append(dt.strftime('%Y-%m-%d'))
+    for dt_idx in d_r_i[1:]:
+        dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
+        row.append(dt.strftime('%Y-%m-%d'))
+    writer.writerow(row)
+
+    idx = 0
+    for ticker_idx in t_s_i:
+        ticker = tickers[ticker_idx]
+        row = []
+        row.append(ticker)
+        for v in wr[idx,:]:
+            row.append(v)
+        for v in dr[idx,:]:
+            row.append(v)
+        writer.writerow(row)
+        idx += 1
 
 
 

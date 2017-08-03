@@ -1,4 +1,6 @@
 import datetime
+from _lsprof import profiler_entry
+
 import numpy as np
 import matplotlib.pyplot as plt
 from enum import Enum
@@ -51,7 +53,7 @@ SLCT_ALG = SelectionAlgo.TOP
 STOP_LOSS_HPR = -0.19
 STOP_LOSS_TYPE = StopLossType.STOCK
 
-GRID_SEARCH = False
+GRID_SEARCH = True
 
 tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq_adj.npz')
 
@@ -305,6 +307,7 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _prob_l = prob_l[beg: end]
 
         prob_median = np.median(_prob_l)
+        prob_median = 0.5
         _s_c_l = c_l[beg: end]
         _s_c_s = c_s[beg: end]
         pred_long_cond = _prob_l >= prob_median
@@ -720,6 +723,19 @@ if GRID_SEARCH:
                 print_rows_for_fixed_params()
 
 else:
+    # plot hpr vs prob
+    z = np.polyfit(prob_l, s_hpr, 2)
+    p = np.poly1d(z)
+    x = np.linspace(0, 1.0, 1000)
+    y = p(x) * 100.0
+
+    fig = plt.figure()
+    fig.clear()
+    ax = fig.add_subplot(1, 1, 1)
+    ax.grid(True, linestyle='-', color='0.75')
+    ax.plot(prob_l, s_hpr * 100.0, 'bo')
+    ax.plot(x, y, 'g-')
+
     model_c_l, model_c_s, model_no_sl, model_eod_sl, model_lb_sl, model_s_sl = calc_classes_and_decisions(
         data_set_records, total_weeks, prob_l
     )
