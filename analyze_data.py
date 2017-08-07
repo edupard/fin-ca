@@ -9,7 +9,7 @@ import csv
 from tickers import get_nyse_nasdaq_tickers, get_nyse_tickers, get_nasdaq_tickers
 from data_utils import filter_activelly_tradeable_stocks, convert_to_mpl_time, get_dates_for_daily_return, \
     get_one_trading_date, get_dates_for_weekly_return, get_tradable_stock_indexes, get_prices, \
-    PxType, calc_z_score, get_tradable_stocks_mask, get_intermediate_dates
+    PxType, calc_z_score, get_tradable_stocks_mask, get_intermediate_dates, get_snp_mask
 from download_utils import load_npz_data, load_npz_data_alt
 from visualization import wealth_graph, confusion_matrix, wealth_csv, calc_wealth
 from visualization import plot_20_random_stock_prices, plot_traded_stocks_per_day
@@ -53,7 +53,7 @@ SLCT_ALG = SelectionAlgo.TOP
 STOP_LOSS_HPR = -0.19
 STOP_LOSS_TYPE = StopLossType.STOCK
 
-GRID_SEARCH = True
+GRID_SEARCH = False
 
 tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq_adj.npz')
 
@@ -61,6 +61,8 @@ raw_mpl_dt = convert_to_mpl_time(raw_dt)
 
 mask, traded_stocks = filter_activelly_tradeable_stocks(raw_data)
 tradable_mask = get_tradable_stocks_mask(raw_data)
+
+snp_mask = get_snp_mask(tickers, raw_data, HIST_BEG, HIST_END)
 
 # plot_20_random_stock_prices(raw_data, raw_mpl_dt)
 # plot_traded_stocks_per_day(traded_stocks, raw_mpl_dt)

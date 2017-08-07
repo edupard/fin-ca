@@ -60,8 +60,8 @@ class Writer:
                             split_factor = d['splitFactor']
 
                             volume = float(v)
-                            if volume == 0:
-                                continue
+                            # if volume == 0:
+                            #     continue
                             dt = d['date'].split("T")[0]
                             t = p.ticker
                             writer.writerow((t, dt, o, c, h, l, v, adj_o, adj_c, adj_h, adj_l, div_cash, split_factor))
@@ -139,43 +139,7 @@ def download_data(tickers, FILE_NAME, START_DATE, END_DATE, NUM_WORKERS=20):
     writer.join()
 
 
-def preprocess_data(ticker_to_idx, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME):
-    print('preprocessing data...')
-    num_tickers = len(ticker_to_idx)
-    days = (END_DATE - START_DATE).days
-    data_points = days + 1
-
-    raw_data = np.zeros((num_tickers, data_points, 5))
-    raw_dt = np.zeros((data_points))
-    for idx in range(data_points):
-        date = START_DATE + datetime.timedelta(days=idx)
-        # convert date to datetime
-        dt = datetime.datetime.combine(date, datetime.time.min)
-        raw_dt[idx] = dt.timestamp()
-
-    with open(FILE_NAME, 'r') as csvfile:
-        reader = csv.reader(csvfile)
-        # idx = 0
-        for row in reader:
-            ticker = row[0]
-            ticker_idx = ticker_to_idx[ticker]
-            dt = datetime.datetime.strptime(row[1], '%Y-%m-%d').date()
-            dt_idx = (dt - START_DATE).days
-            o = float(row[2])
-            c = float(row[3])
-            h = float(row[4])
-            l = float(row[5])
-            v = float(row[6])
-            raw_data[ticker_idx, dt_idx, 0] = o
-            raw_data[ticker_idx, dt_idx, 1] = h
-            raw_data[ticker_idx, dt_idx, 2] = l
-            raw_data[ticker_idx, dt_idx, 3] = c
-            raw_data[ticker_idx, dt_idx, 4] = v
-
-    np.savez(DUMP_FILE_NAME, raw_dt=raw_dt, raw_data=raw_data)
-    print('preprocess task completed')
-
-def preprocess_data_alt(tickers, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME, use_adj_px):
+def preprocess_data(tickers, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME, use_adj_px):
     print('preprocessing data...')
 
     ticker_to_idx = {}
