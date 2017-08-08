@@ -16,6 +16,9 @@ from visualization import plot_20_random_stock_prices, plot_traded_stocks_per_da
 from nn import train_ae, train_ffnn, train_rbm, evaluate_ffnn
 from date_range import HIST_BEG, HIST_END
 
+MIN_SELECTION_STOCKS = 100
+MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 10
+
 NUM_WEEKS = 12
 NUM_DAYS = 5
 
@@ -43,6 +46,7 @@ class StopLossType(Enum):
     LB = 2
     STOCK = 3
 
+
 ADJ_PX = True
 
 SLCT_TYPE = SelectionType.FIXED
@@ -65,12 +69,11 @@ mask, traded_stocks = filter_activelly_tradeable_stocks(raw_data)
 
 tradable_mask = get_tradable_stocks_mask(raw_data)
 tradable_stocks_per_day = tradable_mask[:, :].sum(0)
-trading_day_mask = tradable_stocks_per_day > 10
+trading_day_mask = tradable_stocks_per_day > MIN_STOCKS_TRADABLE_PER_TRADING_DAY
 
 snp_mask = get_snp_mask(tickers, raw_data, HIST_BEG, HIST_END)
 
 # plot_20_random_stock_prices(raw_data, raw_mpl_dt)
-# plot_traded_stocks_per_day(traded_stocks, raw_mpl_dt)
 # plot_traded_stocks_per_day(tradable_stocks_per_day, raw_mpl_dt)
 
 TRAIN_BEG = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
@@ -161,12 +164,20 @@ while True:
         ext_r_i = w_r_i[-1:]
 
     a_s_i = get_active_stks(raw_data, trading_day_mask, w_r_i[0], d_r_i[-1])
-
     tw_r_i = get_intermediate_dates(trading_day_mask, ent_r_i[0], ext_r_i[0])
+    # stocks should be tradeable on all dates we need for calcs
+    t_s_i = get_tradable_stock_indexes(tradable_mask, w_r_i + d_r_i + ent_r_i + ext_r_i + tw_r_i)
+    # tradable + active
+    t_s_i = np.intersect1d(t_s_i, a_s_i)
 
-    t_s_i = get_tradable_stock_indexes(mask, w_r_i[:-1] + d_r_i)
-    t_s_i_e_e = get_tradable_stock_indexes(tradable_mask, w_r_i[-1:] + ent_r_i + ext_r_i + tw_r_i)
-    t_s_i = np.intersect1d(t_s_i, t_s_i_e_e)
+    # t_s_i_old = get_tradable_stock_indexes(mask, w_r_i[:-1] + d_r_i)
+    # t_s_i_e_e = get_tradable_stock_indexes(tradable_mask, w_r_i[-1:] + ent_r_i + ext_r_i + tw_r_i)
+    # t_s_i_old = np.intersect1d(t_s_i_old, t_s_i_e_e)
+    #
+    # print("new: %d vs old: %d" % (t_s_i.shape[0], t_s_i_old.shape[0]))
+
+    if t_s_i.shape[0] < MIN_SELECTION_STOCKS:
+        continue
 
     d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE, ADJ_PX)
     w_c = get_prices(raw_data, t_s_i, w_r_i, PxType.CLOSE, ADJ_PX)
@@ -699,20 +710,20 @@ if GRID_SEARCH:
                 writer.writerow(
                     (
                         sl_name,
-                        "%.2f%%" % (STOP_LOSS_HPR * 100.0),
+                        "%.2f" % STOP_LOSS_HPR,
                         SLCT_VAL,
                         'pct' if SLCT_TYPE == SelectionType.PCT else 'fixed',
                         wealth[-1],
-                        "%.2f%%" % (min_min_w_eod * 100.0),
-                        "%.2f%%" % (min_min_w_lb * 100.0),
-                        "%.2f%%" % (dd * 100.0),
-                        "%.2f%%" % (w_dd * 100.0),
-                        "%.2f%%" % (w_avg * 100.0),
-                        "%.2f%%" % (w_best * 100.0),
+                        "%.2f" % min_min_w_eod,
+                        "%.2f" % min_min_w_lb,
+                        "%.2f" % dd,
+                        "%.2f" % w_dd,
+                        "%.2f" % w_avg,
+                        "%.2f" % w_best,
                         sharpe,
-                        "%.2f%%" % (yr_avg * 100.0),
+                        "%.2f" % yr_avg,
                         rc_wealth[-1],
-                        "%.2f%%" % (rc_dd * 100.0)
+                        "%.2f" % rc_dd
                     ))
 
             print_row(model_no_sl, 'no')

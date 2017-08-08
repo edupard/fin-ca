@@ -18,7 +18,8 @@ DATA_ADJ_CLOSE_IDX = 8
 
 
 def get_tradable_stocks_mask(raw_data):
-    mask = raw_data[:, :, DATA_VOLUME_IDX] > 0.0
+    mask = np.all(raw_data > 0.0, axis=2)
+    # mask = raw_data[:, :, DATA_VOLUME_IDX] > 0.0 &
     return mask
 
 
