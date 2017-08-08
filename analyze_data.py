@@ -9,7 +9,7 @@ import csv
 from tickers import get_nyse_nasdaq_tickers, get_nyse_tickers, get_nasdaq_tickers
 from data_utils import filter_activelly_tradeable_stocks, convert_to_mpl_time, get_dates_for_daily_return, \
     get_one_trading_date, get_dates_for_weekly_return, get_tradable_stock_indexes, get_prices, \
-    PxType, calc_z_score, get_tradable_stocks_mask, get_intermediate_dates, get_snp_mask
+    PxType, calc_z_score, get_tradable_stocks_mask, get_intermediate_dates, get_snp_mask, get_active_stks
 from download_utils import load_npz_data, load_npz_data_alt
 from visualization import wealth_graph, confusion_matrix, wealth_csv, calc_wealth
 from visualization import plot_20_random_stock_prices, plot_traded_stocks_per_day
@@ -43,6 +43,7 @@ class StopLossType(Enum):
     LB = 2
     STOCK = 3
 
+ADJ_PX = True
 
 SLCT_TYPE = SelectionType.FIXED
 SLCT_VAL = 4
@@ -55,17 +56,22 @@ STOP_LOSS_TYPE = StopLossType.STOCK
 
 GRID_SEARCH = False
 
-tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq_adj.npz')
+tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq.npz')
+# tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq_adj.npz')
 
 raw_mpl_dt = convert_to_mpl_time(raw_dt)
 
 mask, traded_stocks = filter_activelly_tradeable_stocks(raw_data)
+
 tradable_mask = get_tradable_stocks_mask(raw_data)
+tradable_stocks_per_day = tradable_mask[:, :].sum(0)
+trading_day_mask = tradable_stocks_per_day > 10
 
 snp_mask = get_snp_mask(tickers, raw_data, HIST_BEG, HIST_END)
 
 # plot_20_random_stock_prices(raw_data, raw_mpl_dt)
 # plot_traded_stocks_per_day(traded_stocks, raw_mpl_dt)
+# plot_traded_stocks_per_day(tradable_stocks_per_day, raw_mpl_dt)
 
 TRAIN_BEG = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
 # TRAIN_END = HIST_END
@@ -129,17 +135,17 @@ while True:
     # break when all availiable data processed
     if SUNDAY > HIST_END:
         break
-    w_r_i = get_dates_for_weekly_return(HIST_BEG, HIST_END, traded_stocks, SUNDAY, NUM_WEEKS + 1)
+    w_r_i = get_dates_for_weekly_return(HIST_BEG, HIST_END, trading_day_mask, SUNDAY, NUM_WEEKS + 1)
     # continue if all data not availiable yet
     if w_r_i is None:
         continue
-    d_r_i = get_dates_for_daily_return(HIST_BEG, HIST_END, traded_stocks, SUNDAY - datetime.timedelta(days=7),
+    d_r_i = get_dates_for_daily_return(HIST_BEG, HIST_END, trading_day_mask, SUNDAY - datetime.timedelta(days=7),
                                        NUM_DAYS)
     # continue if all data not availiable yet
     if d_r_i is None:
         continue
     if ENT_ON_MON:
-        ent_r_i = get_one_trading_date(HIST_BEG, HIST_END, traded_stocks,
+        ent_r_i = get_one_trading_date(HIST_BEG, HIST_END, trading_day_mask,
                                        SUNDAY - datetime.timedelta(days=7) + datetime.timedelta(days=1))
         if ent_r_i is None:
             continue
@@ -147,22 +153,23 @@ while True:
         ent_r_i = d_r_i[-1:]
 
     if EXIT_ON_MON:
-        ext_r_i = get_one_trading_date(HIST_BEG, HIST_END, traded_stocks,
+        ext_r_i = get_one_trading_date(HIST_BEG, HIST_END, trading_day_mask,
                                        SUNDAY + datetime.timedelta(days=1))
         if ext_r_i is None:
             continue
     else:
         ext_r_i = w_r_i[-1:]
 
-    tw_r_i = get_intermediate_dates(HIST_BEG, HIST_END, traded_stocks, ent_r_i, ext_r_i)
+    a_s_i = get_active_stks(raw_data, trading_day_mask, w_r_i[0], d_r_i[-1])
 
-    # t_s_i = get_tradable_stock_indexes(mask, w_r_i + d_r_i + ent_r_i + ext_r_i)
+    tw_r_i = get_intermediate_dates(trading_day_mask, ent_r_i[0], ext_r_i[0])
+
     t_s_i = get_tradable_stock_indexes(mask, w_r_i[:-1] + d_r_i)
     t_s_i_e_e = get_tradable_stock_indexes(tradable_mask, w_r_i[-1:] + ent_r_i + ext_r_i + tw_r_i)
     t_s_i = np.intersect1d(t_s_i, t_s_i_e_e)
 
-    d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE)
-    w_c = get_prices(raw_data, t_s_i, w_r_i, PxType.CLOSE)
+    d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE, ADJ_PX)
+    w_c = get_prices(raw_data, t_s_i, w_r_i, PxType.CLOSE, ADJ_PX)
 
     # exit_date = datetime.datetime.fromtimestamp(raw_dt[ext_r_i[0]]).date()
     # if exit_date == datetime.datetime.strptime('2017-07-07', '%Y-%m-%d').date():
@@ -192,11 +199,11 @@ while True:
     px_type = PxType.CLOSE
     if ENT_ON_MON and ENT_MON_OPEN:
         px_type = PxType.OPEN
-    ent_px = get_prices(raw_data, t_s_i, ent_r_i, px_type)
+    ent_px = get_prices(raw_data, t_s_i, ent_r_i, px_type, ADJ_PX)
     px_type = PxType.CLOSE
     if EXIT_ON_MON and EXIT_ON_MON_OPEN:
         px_type = PxType.OPEN
-    ext_px = get_prices(raw_data, t_s_i, ext_r_i, px_type)
+    ext_px = get_prices(raw_data, t_s_i, ext_r_i, px_type, ADJ_PX)
 
     # calc daily returns
     d_n_r = calc_z_score(d_c)
@@ -205,13 +212,13 @@ while True:
     _s_hpr = (w_c[:, NUM_WEEKS + 1] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
     _s_hpr_model = (ext_px[:, 0] - ent_px[:, 0]) / ent_px[:, 0]
 
-    tw_s_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.CLOSE)
+    tw_s_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.CLOSE, ADJ_PX)
     _t_w_s_hpr = ((tw_s_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
 
-    tw_s_h_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.HIGH)
+    tw_s_h_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.HIGH, ADJ_PX)
     _t_w_s_h_hpr = ((tw_s_h_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
 
-    tw_s_l_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.LOW)
+    tw_s_l_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.LOW, ADJ_PX)
     _t_w_s_l_hpr = ((tw_s_l_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
 
     _s_int_r = (ent_px[:, 0] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]

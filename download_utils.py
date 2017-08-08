@@ -152,7 +152,7 @@ def preprocess_data(tickers, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME, us
     days = (END_DATE - START_DATE).days
     data_points = days + 1
 
-    raw_data = np.zeros((num_tickers, data_points, 5))
+    raw_data = np.zeros((num_tickers, data_points, 9))
     raw_dt = np.zeros((data_points))
     for idx in range(data_points):
         date = START_DATE + datetime.timedelta(days=idx)
@@ -196,17 +196,15 @@ def preprocess_data(tickers, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME, us
                 # d_c = float(row[11])
                 # s_f = float(row[12])
 
-                if use_adj_px:
-                    raw_data[ticker_idx, dt_idx, 0] = a_o
-                    raw_data[ticker_idx, dt_idx, 1] = a_h
-                    raw_data[ticker_idx, dt_idx, 2] = a_l
-                    raw_data[ticker_idx, dt_idx, 3] = a_c
-                else:
-                    raw_data[ticker_idx, dt_idx, 0] = o
-                    raw_data[ticker_idx, dt_idx, 1] = h
-                    raw_data[ticker_idx, dt_idx, 2] = l
-                    raw_data[ticker_idx, dt_idx, 3] = c
+                raw_data[ticker_idx, dt_idx, 0] = o
+                raw_data[ticker_idx, dt_idx, 1] = h
+                raw_data[ticker_idx, dt_idx, 2] = l
+                raw_data[ticker_idx, dt_idx, 3] = c
                 raw_data[ticker_idx, dt_idx, 4] = v
+                raw_data[ticker_idx, dt_idx, 5] = a_o
+                raw_data[ticker_idx, dt_idx, 6] = a_h
+                raw_data[ticker_idx, dt_idx, 7] = a_l
+                raw_data[ticker_idx, dt_idx, 8] = a_c
             except:
                 pass
 

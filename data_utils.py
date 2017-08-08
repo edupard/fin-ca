@@ -6,9 +6,19 @@ from enum import Enum
 
 CAP = 50
 
+DATA_OPEN_IDX = 0
+DATA_HIGH_IDX = 1
+DATA_LOW_IDX = 2
+DATA_CLOSE_IDX = 3
+DATA_VOLUME_IDX = 4
+DATA_ADJ_OPEN_IDX = 5
+DATA_ADJ_HIGH_IDX = 6
+DATA_ADJ_LOW_IDX = 7
+DATA_ADJ_CLOSE_IDX = 8
+
 
 def get_tradable_stocks_mask(raw_data):
-    mask = raw_data[:, :, 3] > 0.0
+    mask = raw_data[:, :, DATA_VOLUME_IDX] > 0.0
     return mask
 
 
@@ -51,7 +61,8 @@ def get_snp_mask(tickers, raw_data, start_date, end_date):
 
 
 def filter_activelly_tradeable_stocks(raw_data):
-    g_a = raw_data[:, :, 4] * raw_data[:, :, 3]
+    g_a = raw_data[:, :, DATA_VOLUME_IDX] * raw_data[:, :, DATA_CLOSE_IDX]
+    # g_a = raw_data[:, :, DATA_VOLUME_IDX] * raw_data[:, :, DATA_ADJ_CLOSE_IDX]
     mask = g_a[:, :] > 10000000
     # alternative tradable stock selection algos
     # g_a_a = np.average(g_a, axis=0)
@@ -81,7 +92,7 @@ def get_data_idx(dt, start_date, end_date):
     return (dt - start_date).days
 
 
-def get_dates_for_weekly_return(start_date, end_date, traded_stocks, date, n_w):
+def get_dates_for_weekly_return(start_date, end_date, trading_day_mask, date, n_w):
     dates = []
     t_d = date
     populated = 0
@@ -90,7 +101,7 @@ def get_dates_for_weekly_return(start_date, end_date, traded_stocks, date, n_w):
         if data_idx is None:
             return None
         for j in range(date.isoweekday()):
-            if traded_stocks[data_idx] > CAP:
+            if trading_day_mask[data_idx]:
                 dates.append(data_idx)
                 populated += 1
                 break
@@ -101,14 +112,14 @@ def get_dates_for_weekly_return(start_date, end_date, traded_stocks, date, n_w):
     return dates[::-1]
 
 
-def get_dates_for_daily_return(start_date, end_date, traded_stocks, date, n_d):
+def get_dates_for_daily_return(start_date, end_date, trading_day_mask, date, n_d):
     dates = []
     data_idx = get_data_idx(date, start_date, end_date)
     if data_idx is None:
         return None
     populated = 0
     while populated < n_d + 1:
-        if traded_stocks[data_idx] > CAP:
+        if trading_day_mask[data_idx]:
             dates.append(data_idx)
             populated += 1
         data_idx -= 1
@@ -117,7 +128,7 @@ def get_dates_for_daily_return(start_date, end_date, traded_stocks, date, n_d):
     return dates[::-1]
 
 
-def get_one_trading_date(start_date, end_date, traded_stocks, date):
+def get_one_trading_date(start_date, end_date, trading_day_mask, date):
     dates = []
     data_idx = get_data_idx(date, start_date, end_date)
     end_data_idx = get_data_idx(end_date, start_date, end_date)
@@ -125,7 +136,7 @@ def get_one_trading_date(start_date, end_date, traded_stocks, date):
         return None
     populated = 0
     while populated < 1:
-        if traded_stocks[data_idx] > CAP:
+        if trading_day_mask[data_idx]:
             dates.append(data_idx)
             populated += 1
         data_idx += 1
@@ -134,14 +145,23 @@ def get_one_trading_date(start_date, end_date, traded_stocks, date):
     return dates[::-1]
 
 
-def get_intermediate_dates(start_date, end_date, traded_stocks, ent_r_i, ext_r_i):
+def get_intermediate_dates(trading_day_mask, ent_r_i, ext_r_i):
     dates = []
-    data_idx = ent_r_i[0] + 1
-    while data_idx <= ext_r_i[0]:
-        if traded_stocks[data_idx] > CAP:
+    data_idx = ent_r_i + 1
+    while data_idx <= ext_r_i:
+        if trading_day_mask[data_idx]:
             dates.append(data_idx)
         data_idx += 1
     return dates
+
+def get_active_stks(raw_data, trading_day_mask, s_i, e_i):
+    dts = get_intermediate_dates(trading_day_mask, s_i, e_i)
+    raw_data = raw_data[:, dts, :]
+    g_a = raw_data[:, :, DATA_VOLUME_IDX] * raw_data[:, :, DATA_CLOSE_IDX]
+    avg_g_a = np.mean(g_a, axis= 1)
+    active_stk_mask = avg_g_a > 10000000
+    t_s_i = np.where(active_stk_mask)[0]
+    return t_s_i
 
 
 def get_tradable_stock_indexes(mask, r_i):
@@ -161,15 +181,32 @@ class PxType(Enum):
     CLOSE = 3
 
 
-def get_prices(raw_data, t_s_i, r_i, px_type: PxType):
-    type_to_idx = {
-        PxType.OPEN: 0,
-        PxType.HIGH: 1,
-        PxType.LOW: 2,
-        PxType.CLOSE: 3
-    }
+def get_price_idx(px_type: PxType, adj_px):
+    if adj_px:
+        type_to_idx = {
+            PxType.OPEN: DATA_ADJ_OPEN_IDX,
+            PxType.HIGH: DATA_ADJ_HIGH_IDX,
+            PxType.LOW: DATA_ADJ_LOW_IDX,
+            PxType.CLOSE: DATA_ADJ_CLOSE_IDX
+        }
+    else:
+        type_to_idx = {
+            PxType.OPEN: DATA_OPEN_IDX,
+            PxType.HIGH: DATA_HIGH_IDX,
+            PxType.LOW: DATA_LOW_IDX,
+            PxType.CLOSE: DATA_CLOSE_IDX
+        }
 
-    px_idx = type_to_idx.get(px_type, 3)
+    return type_to_idx.get(px_type)
+
+
+def get_price(raw_data, s_i, r_i, px_type: PxType, adj_px):
+    px_idx = get_price_idx(px_type, adj_px)
+    return raw_data[s_i, r_i, px_idx]
+
+
+def get_prices(raw_data, t_s_i, r_i, px_type: PxType, adj_px):
+    px_idx = get_price_idx(px_type, adj_px)
     c = raw_data[:, r_i, :]
     c = c[t_s_i, :, :]
     c = c[:, :, px_idx]

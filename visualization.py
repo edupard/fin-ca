@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib
 import random
-import scipy.stats as stats
 import numpy as np
 import math
 import datetime
