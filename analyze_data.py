@@ -9,15 +9,13 @@ import csv
 from tickers import get_nyse_nasdaq_tickers, get_nyse_tickers, get_nasdaq_tickers
 from data_utils import filter_activelly_tradeable_stocks, convert_to_mpl_time, get_dates_for_daily_return, \
     get_one_trading_date, get_dates_for_weekly_return, get_tradable_stock_indexes, get_prices, \
-    PxType, calc_z_score, get_tradable_stocks_mask, get_intermediate_dates, get_snp_mask, get_active_stks
+    PxType, calc_z_score, get_tradable_stocks_mask, get_intermediate_dates, get_snp_mask, get_active_stks, \
+    get_top_tradable_stks
 from download_utils import load_npz_data, load_npz_data_alt
 from visualization import wealth_graph, confusion_matrix, wealth_csv, calc_wealth
 from visualization import plot_20_random_stock_prices, plot_traded_stocks_per_day
 from nn import train_ae, train_ffnn, train_rbm, evaluate_ffnn
 from date_range import HIST_BEG, HIST_END
-
-MIN_SELECTION_STOCKS = 100
-MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 10
 
 NUM_WEEKS = 12
 NUM_DAYS = 5
@@ -59,6 +57,16 @@ STOP_LOSS_HPR = -0.19
 STOP_LOSS_TYPE = StopLossType.STOCK
 
 GRID_SEARCH = False
+
+MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 10
+
+MIN_SELECTION_FILTER = True
+MIN_SELECTION_STOCKS = 100
+
+AVG_DAY_TO_FILTER = True
+AVG_DAY_TO_LIMIT = 10000000
+TOP_TRADABLE_FILTER = False
+TOP_TRADABLE_STOCKS = 100
 
 tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq.npz')
 # tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq_adj.npz')
@@ -163,12 +171,19 @@ while True:
     else:
         ext_r_i = w_r_i[-1:]
 
-    a_s_i = get_active_stks(raw_data, trading_day_mask, w_r_i[0], d_r_i[-1])
+
+
+
     tw_r_i = get_intermediate_dates(trading_day_mask, ent_r_i[0], ext_r_i[0])
     # stocks should be tradeable on all dates we need for calcs
     t_s_i = get_tradable_stock_indexes(tradable_mask, w_r_i + d_r_i + ent_r_i + ext_r_i + tw_r_i)
-    # tradable + active
-    t_s_i = np.intersect1d(t_s_i, a_s_i)
+
+    if AVG_DAY_TO_FILTER:
+        a_s_i = get_active_stks(raw_data, trading_day_mask, w_r_i[0], d_r_i[-1], AVG_DAY_TO_LIMIT)
+        t_s_i = np.intersect1d(t_s_i, a_s_i)
+    if TOP_TRADABLE_FILTER:
+        t_t_s_i = get_top_tradable_stks(raw_data, trading_day_mask, w_r_i[0], d_r_i[-1], TOP_TRADABLE_STOCKS)
+        t_s_i = np.intersect1d(t_s_i, t_t_s_i)
 
     # t_s_i_old = get_tradable_stock_indexes(mask, w_r_i[:-1] + d_r_i)
     # t_s_i_e_e = get_tradable_stock_indexes(tradable_mask, w_r_i[-1:] + ent_r_i + ext_r_i + tw_r_i)
@@ -176,7 +191,7 @@ while True:
     #
     # print("new: %d vs old: %d" % (t_s_i.shape[0], t_s_i_old.shape[0]))
 
-    if t_s_i.shape[0] < MIN_SELECTION_STOCKS:
+    if MIN_SELECTION_FILTER and t_s_i.shape[0] < MIN_SELECTION_STOCKS:
         continue
 
     d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE, ADJ_PX)
@@ -274,7 +289,7 @@ while True:
 
 train_rbm(train_records, dr, wr)
 train_ae(train_records, dr, wr)
-train_ffnn(train_records, dr, wr, c_l, c_s, w_data_index, w_num_stocks)
+train_ffnn(train_records, train_weeks, dr, wr, c_l, c_s, w_data_index, w_num_stocks)
 
 prob_l = np.zeros((data_set_records), dtype=np.float)
 evaluate_ffnn(data_set_records, dr, wr, prob_l)
@@ -695,6 +710,7 @@ if GRID_SEARCH:
             def print_row(model, sl_name):
                 model_hpr, model_min_w_eod_hpr, model_min_w_lb_hpr, model_l_stops, model_s_stops, model_l_port, model_s_port = model
 
+                # TODO: raw_dt[train_weeks:] is error
                 wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(model_hpr[train_weeks:],
                                                                                          w_enter_index[train_weeks:],
                                                                                          raw_dt[train_weeks:])
@@ -775,6 +791,7 @@ else:
     model = type_to_idx.get(STOP_LOSS_TYPE, model_no_sl)
     model_hpr, model_min_w_eod_hpr, model_min_w_lb_hpr, model_l_stops, model_s_stops, model_l_port, model_s_port = model
 
+    # TODO: raw_dt[train_weeks:] is error
     wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(model_hpr[train_weeks:],
                                                                              w_enter_index[train_weeks:],
                                                                              raw_dt[train_weeks:])

@@ -155,12 +155,21 @@ def get_intermediate_dates(trading_day_mask, ent_r_i, ext_r_i):
         data_idx += 1
     return dates
 
-def get_active_stks(raw_data, trading_day_mask, s_i, e_i):
+def get_top_tradable_stks(raw_data, trading_day_mask, s_i, e_i, limit):
+    dts = get_intermediate_dates(trading_day_mask, s_i, e_i)
+    raw_data = raw_data[:, dts, :]
+    g_a = raw_data[:, :, DATA_VOLUME_IDX] * raw_data[:, :, DATA_CLOSE_IDX]
+    avg_g_a = np.mean(g_a, axis=1)
+    s_t_s_i = np.argsort(avg_g_a)
+    t_s_i = s_t_s_i[-limit:]
+    return t_s_i
+
+def get_active_stks(raw_data, trading_day_mask, s_i, e_i, limit):
     dts = get_intermediate_dates(trading_day_mask, s_i, e_i)
     raw_data = raw_data[:, dts, :]
     g_a = raw_data[:, :, DATA_VOLUME_IDX] * raw_data[:, :, DATA_CLOSE_IDX]
     avg_g_a = np.mean(g_a, axis= 1)
-    active_stk_mask = avg_g_a > 10000000
+    active_stk_mask = avg_g_a > limit
     t_s_i = np.where(active_stk_mask)[0]
     return t_s_i
 

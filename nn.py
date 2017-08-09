@@ -13,7 +13,7 @@ LOAD_RBM_WEIGHTS = True
 AU_EPOCH_TO_TRAIN = 30
 AU_BATCH_SIZE = 10
 
-TRAIN_FFNN = True
+TRAIN_FFNN = False
 LOAD_AU_WEIGHTS = False
 FFNN_EPOCH_TO_TRAIN = 1001
 ALIGN_BATCH_TO_DATA = True
@@ -142,7 +142,7 @@ def train_ae(train_records, dr, wr):
     autoencoder.save_weights('./rbm/au.chp')
 
 
-def train_ffnn(train_records, dr, wr, c_l, c_s, w_data_index, w_num_stocks):
+def train_ffnn(train_records, train_weeks, dr, wr, c_l, c_s, w_data_index, w_num_stocks):
     if not TRAIN_FFNN:
         return
     ffnn = ffnn_instance()
@@ -156,7 +156,7 @@ def train_ffnn(train_records, dr, wr, c_l, c_s, w_data_index, w_num_stocks):
         ffnn.load_au_weights('./rbm/au.chp', ['rbmw2', 'rbmhb2'], 1)
 
     if ALIGN_BATCH_TO_DATA:
-        batches_per_epoch = w_data_index.shape[0]
+        batches_per_epoch = w_data_index[:train_weeks].shape[0]
         for i in range(FFNN_EPOCH_TO_TRAIN):
             epoch_cost = 0.
             curr_progress = 0
