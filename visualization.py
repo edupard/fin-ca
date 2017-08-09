@@ -211,22 +211,22 @@ def calc_wealth(model_hpr, w_enter_index, raw_dt):
 
 
 def wealth_csv(sl_name,
-               beg,
-               end,
+               wk_beg_idx,
+               wk_end_idx,
                w_enter_index,
                w_exit_index,
                raw_dt,
                model):
     model_hpr, model_min_w_eod_hpr, model_min_w_lb_hpr, model_l_stops, model_s_stops, model_l_port, model_s_port = model
-    model_hpr = model_hpr[beg:end]
-    model_min_w_eod_hpr = model_min_w_eod_hpr[beg:end]
-    model_min_w_lb_hpr = model_min_w_lb_hpr[beg:end]
-    model_l_stops = model_l_stops[beg:end]
-    model_s_stops = model_s_stops[beg:end]
-    model_l_port = model_l_port[beg:end]
-    model_s_port = model_s_port[beg:end]
-    w_enter_index = w_enter_index[beg:end]
-    w_exit_index = w_exit_index[beg:end]
+    model_hpr = model_hpr[wk_beg_idx:wk_end_idx]
+    model_min_w_eod_hpr = model_min_w_eod_hpr[wk_beg_idx:wk_end_idx]
+    model_min_w_lb_hpr = model_min_w_lb_hpr[wk_beg_idx:wk_end_idx]
+    model_l_stops = model_l_stops[wk_beg_idx:wk_end_idx]
+    model_s_stops = model_s_stops[wk_beg_idx:wk_end_idx]
+    model_l_port = model_l_port[wk_beg_idx:wk_end_idx]
+    model_s_port = model_s_port[wk_beg_idx:wk_end_idx]
+    w_enter_index = w_enter_index[wk_beg_idx:wk_end_idx]
+    w_exit_index = w_exit_index[wk_beg_idx:wk_end_idx]
 
     progress = model_hpr
     wealth = np.cumsum(progress) + 1.0

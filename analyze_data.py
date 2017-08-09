@@ -63,17 +63,19 @@ MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 10
 MIN_SELECTION_FILTER = True
 MIN_SELECTION_STOCKS = 100
 
-AVG_DAY_TO_FILTER = True
+AVG_DAY_TO_FILTER = False
 AVG_DAY_TO_LIMIT = 10000000
 TOP_TRADABLE_FILTER = False
 TOP_TRADABLE_STOCKS = 100
+DAY_TO_FILTER = True
+DAY_TO_LIMIT = 10000000
 
 tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq.npz')
 # tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq_adj.npz')
 
 raw_mpl_dt = convert_to_mpl_time(raw_dt)
 
-mask, traded_stocks = filter_activelly_tradeable_stocks(raw_data)
+actively_tradeable_mask = filter_activelly_tradeable_stocks(raw_data, DAY_TO_FILTER)
 
 tradable_mask = get_tradable_stocks_mask(raw_data)
 tradable_stocks_per_day = tradable_mask[:, :].sum(0)
@@ -86,13 +88,26 @@ snp_mask = get_snp_mask(tickers, raw_data, HIST_BEG, HIST_END)
 
 TRAIN_BEG = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
 # TRAIN_END = HIST_END
-# TRAIN_END = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
+TRAIN_END = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
 # TRAIN_END = datetime.datetime.strptime('2015-01-01', '%Y-%m-%d').date()
-TRAIN_END = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
+# TRAIN_END = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
+
+# CV_BEG = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
+CV_BEG = HIST_BEG
+CV_END = HIST_END
+
 SUNDAY = TRAIN_BEG + datetime.timedelta(days=7 - TRAIN_BEG.isoweekday())
 
-train_records = 0
-train_weeks = 0
+cv_beg_idx = None
+cv_end_idx = None
+cv_wk_beg_idx = None
+cv_wk_end_idx = None
+
+tr_beg_idx = None
+tr_end_idx = None
+tr_wk_beg_idx = None
+tr_wk_end_idx = None
+
 total_weeks = 0
 data_set_records = 0
 
@@ -140,6 +155,42 @@ def make_array(value):
     return np.array([value]).astype(np.int32)
 
 
+def update_indexes():
+    global cv_beg_idx
+    global cv_end_idx
+    global cv_wk_beg_idx
+    global cv_wk_end_idx
+
+    global tr_beg_idx
+    global tr_end_idx
+    global tr_wk_beg_idx
+    global tr_wk_end_idx
+
+    if SUNDAY >= TRAIN_BEG and SUNDAY <= TRAIN_END:
+        if tr_beg_idx is None:
+            tr_beg_idx = data_set_records
+        if tr_wk_beg_idx is None:
+            tr_wk_beg_idx = total_weeks
+
+    if SUNDAY > TRAIN_END:
+        if tr_end_idx is None:
+            tr_end_idx = data_set_records
+        if tr_wk_end_idx is None:
+            tr_wk_end_idx = total_weeks
+
+    if SUNDAY >= CV_BEG and SUNDAY <= CV_END:
+        if cv_beg_idx is None:
+            cv_beg_idx = data_set_records
+        if cv_wk_beg_idx is None:
+            cv_wk_beg_idx = total_weeks
+
+    if SUNDAY > CV_END:
+        if cv_end_idx is None:
+            cv_end_idx = data_set_records
+        if cv_wk_end_idx is None:
+            cv_wk_end_idx = total_weeks
+
+
 while True:
     # iterate over weeks
     SUNDAY = SUNDAY + datetime.timedelta(days=7)
@@ -171,9 +222,6 @@ while True:
     else:
         ext_r_i = w_r_i[-1:]
 
-
-
-
     tw_r_i = get_intermediate_dates(trading_day_mask, ent_r_i[0], ext_r_i[0])
     # stocks should be tradeable on all dates we need for calcs
     t_s_i = get_tradable_stock_indexes(tradable_mask, w_r_i + d_r_i + ent_r_i + ext_r_i + tw_r_i)
@@ -184,8 +232,10 @@ while True:
     if TOP_TRADABLE_FILTER:
         t_t_s_i = get_top_tradable_stks(raw_data, trading_day_mask, w_r_i[0], d_r_i[-1], TOP_TRADABLE_STOCKS)
         t_s_i = np.intersect1d(t_s_i, t_t_s_i)
+    if DAY_TO_FILTER:
+        a_t_s_i = get_tradable_stock_indexes(actively_tradeable_mask, w_r_i[:-1] + d_r_i)
+        t_s_i = np.intersect1d(t_s_i, a_t_s_i)
 
-    # t_s_i_old = get_tradable_stock_indexes(mask, w_r_i[:-1] + d_r_i)
     # t_s_i_e_e = get_tradable_stock_indexes(tradable_mask, w_r_i[-1:] + ent_r_i + ext_r_i + tw_r_i)
     # t_s_i_old = np.intersect1d(t_s_i_old, t_s_i_e_e)
     #
@@ -280,16 +330,17 @@ while True:
     w_enter_index = append_data(w_enter_index, make_array(enter_date_idx))
     w_exit_index = append_data(w_exit_index, make_array(exit_date_idx))
 
+    update_indexes()
+
     # record counts
     data_set_records += num_stocks
     total_weeks += 1
-    if SUNDAY <= TRAIN_END:
-        train_records += num_stocks
-        train_weeks += 1
 
-train_rbm(train_records, dr, wr)
-train_ae(train_records, dr, wr)
-train_ffnn(train_records, train_weeks, dr, wr, c_l, c_s, w_data_index, w_num_stocks)
+update_indexes()
+
+train_rbm(dr, wr, tr_beg_idx, tr_end_idx)
+train_ae(dr, wr, tr_beg_idx, tr_end_idx)
+train_ffnn(dr, wr, c_l, c_s, w_data_index, w_num_stocks, tr_beg_idx, tr_end_idx, tr_wk_beg_idx, tr_wk_end_idx)
 
 prob_l = np.zeros((data_set_records), dtype=np.float)
 evaluate_ffnn(data_set_records, dr, wr, prob_l)
@@ -710,10 +761,9 @@ if GRID_SEARCH:
             def print_row(model, sl_name):
                 model_hpr, model_min_w_eod_hpr, model_min_w_lb_hpr, model_l_stops, model_s_stops, model_l_port, model_s_port = model
 
-                # TODO: raw_dt[train_weeks:] is error
-                wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(model_hpr[train_weeks:],
-                                                                                         w_enter_index[train_weeks:],
-                                                                                         raw_dt[train_weeks:])
+                wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(model_hpr[cv_wk_beg_idx:cv_wk_end_idx],
+                                                                                         w_enter_index[cv_wk_beg_idx:cv_wk_end_idx],
+                                                                                         raw_dt)
 
                 yr_avg = np.mean(yr)
                 w_dd = np.min(model_hpr)
@@ -760,7 +810,9 @@ if GRID_SEARCH:
 
 else:
     # plot hpr vs prob
-    z = np.polyfit(prob_l, s_hpr, 2)
+    _prob_l = prob_l[cv_beg_idx:cv_end_idx]
+    _s_hpr = s_hpr[cv_beg_idx:cv_end_idx]
+    z = np.polyfit(_prob_l, _s_hpr, 2)
     p = np.poly1d(z)
     x = np.linspace(0, 1.0, 1000)
     y = p(x) * 100.0
@@ -769,17 +821,17 @@ else:
     fig.clear()
     ax = fig.add_subplot(1, 1, 1)
     ax.grid(True, linestyle='-', color='0.75')
-    ax.plot(prob_l, s_hpr * 100.0, 'bo')
+    ax.plot(_prob_l, _s_hpr * 100.0, 'bo')
     ax.plot(x, y, 'g-')
 
     model_c_l, model_c_s, model_no_sl, model_eod_sl, model_lb_sl, model_s_sl = calc_classes_and_decisions(
         data_set_records, total_weeks, prob_l
     )
 
-    confusion_matrix(c_l[train_records:],
-                     c_s[train_records:],
-                     model_c_l[train_records:],
-                     model_c_s[train_records:])
+    confusion_matrix(c_l[cv_beg_idx:cv_end_idx],
+                     c_s[cv_beg_idx:cv_end_idx],
+                     model_c_l[cv_beg_idx:cv_end_idx],
+                     model_c_s[cv_beg_idx:cv_end_idx])
 
     type_to_idx = {
         StopLossType.NO: model_no_sl,
@@ -791,10 +843,9 @@ else:
     model = type_to_idx.get(STOP_LOSS_TYPE, model_no_sl)
     model_hpr, model_min_w_eod_hpr, model_min_w_lb_hpr, model_l_stops, model_s_stops, model_l_port, model_s_port = model
 
-    # TODO: raw_dt[train_weeks:] is error
-    wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(model_hpr[train_weeks:],
-                                                                             w_enter_index[train_weeks:],
-                                                                             raw_dt[train_weeks:])
+    wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(model_hpr[cv_wk_beg_idx:cv_wk_end_idx],
+                                                                             w_enter_index[cv_wk_beg_idx:cv_wk_end_idx],
+                                                                             raw_dt)
 
     yr_avg = np.mean(yr)
     w_dd = np.min(model_hpr)
@@ -822,36 +873,36 @@ else:
                  rc_sharpe,
                  yr,
                  years,
-                 w_exit_index,
+                 w_exit_index[cv_wk_beg_idx:cv_wk_end_idx],
                  raw_mpl_dt)
 
     wealth_csv("no",
-               train_weeks,
-               total_weeks,
+               cv_wk_beg_idx,
+               cv_wk_end_idx,
                w_enter_index,
                w_exit_index,
                raw_dt,
                model_no_sl
                )
     wealth_csv("eod",
-               train_weeks,
-               total_weeks,
+               cv_wk_beg_idx,
+               cv_wk_end_idx,
                w_enter_index,
                w_exit_index,
                raw_dt,
                model_eod_sl
                )
     wealth_csv("lb",
-               train_weeks,
-               total_weeks,
+               cv_wk_beg_idx,
+               cv_wk_end_idx,
                w_enter_index,
                w_exit_index,
                raw_dt,
                model_lb_sl
                )
     wealth_csv("stk",
-               train_weeks,
-               total_weeks,
+               cv_wk_beg_idx,
+               cv_wk_end_idx,
                w_enter_index,
                w_exit_index,
                raw_dt,

@@ -5,12 +5,12 @@ import tensorflow as tf
 import numpy as np
 
 TRAIN_RBM = False
-RBM_EPOCH_TO_TRAIN = 50
+RBM_EPOCH_TO_TRAIN = 30
 RBM_BATCH_SIZE = 10
 
 TRAIN_AU = False
-LOAD_RBM_WEIGHTS = True
-AU_EPOCH_TO_TRAIN = 30
+LOAD_RBM_WEIGHTS = False
+AU_EPOCH_TO_TRAIN = 100
 AU_BATCH_SIZE = 10
 
 TRAIN_FFNN = False
@@ -43,11 +43,15 @@ def ffnn_instance():
     return ffnn
 
 
-def train_rbm(train_records, dr, wr):
+def train_rbm(dr, wr, tr_beg_idx, tr_end_idx):
     if not TRAIN_RBM:
         return
     # create rbm layers
     rbmobject1, rbmobject2 = rbm_instance()
+
+    dr = dr[tr_beg_idx:tr_end_idx]
+    wr = wr[tr_beg_idx:tr_end_idx]
+    train_records = tr_end_idx - tr_beg_idx
 
     data_indices = np.arange(train_records)
 
@@ -103,12 +107,17 @@ def train_rbm(train_records, dr, wr):
     rbmobject2.save_weights('./rbm/rbmw2.chp')
 
 
-def train_ae(train_records, dr, wr):
+def train_ae(dr, wr, tr_beg_idx, tr_end_idx):
     if not TRAIN_AU:
         return
     autoencoder = ae_instance()
 
     print("Training Autoencoder")
+
+    dr = dr[tr_beg_idx:tr_end_idx]
+    wr = wr[tr_beg_idx:tr_end_idx]
+
+    train_records = tr_end_idx - tr_beg_idx
 
     data_indices = np.arange(train_records)
 
@@ -142,21 +151,21 @@ def train_ae(train_records, dr, wr):
     autoencoder.save_weights('./rbm/au.chp')
 
 
-def train_ffnn(train_records, train_weeks, dr, wr, c_l, c_s, w_data_index, w_num_stocks):
+def train_ffnn(dr, wr, c_l, c_s, w_data_index, w_num_stocks, tr_beg_idx, tr_end_idx, tr_wk_beg_idx, tr_wk_end_idx):
     if not TRAIN_FFNN:
         return
     ffnn = ffnn_instance()
 
     print("Training FFNN")
 
-    data_indices = np.arange(train_records)
-
     if LOAD_AU_WEIGHTS:
         ffnn.load_au_weights('./rbm/au.chp', ['rbmw1', 'rbmhb1'], 0)
         ffnn.load_au_weights('./rbm/au.chp', ['rbmw2', 'rbmhb2'], 1)
 
     if ALIGN_BATCH_TO_DATA:
-        batches_per_epoch = w_data_index[:train_weeks].shape[0]
+        batches_per_epoch = tr_wk_end_idx - tr_wk_beg_idx
+        w_data_index = w_data_index[tr_wk_beg_idx:tr_wk_end_idx]
+        w_num_stocks = w_num_stocks[tr_wk_beg_idx:tr_wk_end_idx]
         for i in range(FFNN_EPOCH_TO_TRAIN):
             epoch_cost = 0.
             curr_progress = 0
@@ -184,6 +193,12 @@ def train_ffnn(train_records, train_weeks, dr, wr, c_l, c_s, w_data_index, w_num
                 print("Model saved")
                 ffnn.save_weights('./rbm/ffnn.chp')
     else:
+        train_records = tr_end_idx - tr_beg_idx
+        dr = dr[tr_beg_idx:tr_end_idx]
+        wr = wr[tr_beg_idx:tr_end_idx]
+
+        data_indices = np.arange(train_records)
+
         batches_per_epoch = train_records // FFNN_BATCH_SIZE
         for i in range(FFNN_EPOCH_TO_TRAIN):
             np.random.shuffle(data_indices)

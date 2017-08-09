@@ -61,20 +61,10 @@ def get_snp_mask(tickers, raw_data, start_date, end_date):
     return snp_mask
 
 
-def filter_activelly_tradeable_stocks(raw_data):
+def filter_activelly_tradeable_stocks(raw_data, DAY_TO_FILTER):
     g_a = raw_data[:, :, DATA_VOLUME_IDX] * raw_data[:, :, DATA_CLOSE_IDX]
-    # g_a = raw_data[:, :, DATA_VOLUME_IDX] * raw_data[:, :, DATA_ADJ_CLOSE_IDX]
-    mask = g_a[:, :] > 10000000
-    # alternative tradable stock selection algos
-    # g_a_a = np.average(g_a, axis=0)
-    # mask = (g_a[:, :] > (g_a_a[:] / 2.))
-    # mask = (g_a[:, :] > 100000) & (raw_data[:, :, 3] > 5.)
-    # mask = raw_data[:,:,4] != 0
-
-    # calc traded stocks per day num
-    traded_stocks = mask[:, :].sum(0)
-
-    return mask, traded_stocks
+    mask = g_a[:, :] > DAY_TO_FILTER
+    return mask
 
 
 def convert_to_mpl_time(raw_dt):
