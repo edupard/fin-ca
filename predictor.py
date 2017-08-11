@@ -1,8 +1,7 @@
 from download_utils import download_data, parse_tickers, load_npz_data, load_npz_data_alt, preprocess_data
 from data_utils import filter_activelly_tradeable_stocks, get_dates_for_daily_return, get_dates_for_weekly_return, \
-    get_tradable_stock_indexes, get_prices, get_price, get_price_idx, PxType, DATA_CLOSE_IDX, DATA_VOLUME_IDX, \
+    get_tradable_stock_indexes, get_prices, get_price, get_price_idx, PxType, DATA_TO_IDX, \
     calc_z_score, get_data_idx, calc_z_score_alt
-from date_range import HIST_BEG, HIST_END
 from tickers import get_nasdaq_tickers
 import datetime
 import numpy as np
@@ -17,7 +16,6 @@ PERCENTILE = 10
 TODAY = datetime.datetime.today().date()
 
 ONLINE = False
-ADJ_PX = True
 # YYYY-MM-DD
 PREDICTION_DATE = datetime.datetime.strptime('2017-07-28', '%Y-%m-%d').date()
 OPEN_POS_DATE = datetime.datetime.strptime('2017-07-28', '%Y-%m-%d').date()
@@ -32,11 +30,12 @@ END_DATE = HPR_DATE
 
 tickers = get_nasdaq_tickers()
 download_data(tickers, 'data/history.csv', START_DATE, END_DATE, 50)
-preprocess_data(tickers, 'data/history.csv', START_DATE, END_DATE, 'data/history.npz', ADJ_PX)
+preprocess_data(tickers, 'data/history.csv', START_DATE, END_DATE, 'data/history.npz', True)
 tickers, raw_dt, raw_data = load_npz_data_alt('data/history.npz')
 
 mask, traded_stocks = filter_activelly_tradeable_stocks(raw_data)
 
+# TODO: replace volume from last day rather than change mask
 if ONLINE:
     # mark all stocks tradeable
     mask[:, -1] = True
@@ -45,8 +44,8 @@ if ONLINE:
 w_r_i = get_dates_for_weekly_return(START_DATE, END_DATE, traded_stocks, PREDICTION_DATE, NUM_WEEKS)
 d_r_i = get_dates_for_daily_return(START_DATE, END_DATE, traded_stocks, PREDICTION_DATE, NUM_DAYS)
 t_s_i = get_tradable_stock_indexes(mask, w_r_i + d_r_i)
-d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE, ADJ_PX)
-w_c = get_prices(raw_data, t_s_i, w_r_i, PxType.CLOSE, ADJ_PX)
+d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE)
+w_c = get_prices(raw_data, t_s_i, w_r_i, PxType.CLOSE)
 # dr = calc_z_score(d_c)
 dr, d_r, d_c_r, d_r_m, d_r_std = calc_z_score_alt(d_c)
 # wr = calc_z_score(w_c)
@@ -209,16 +208,15 @@ with open('./data/prediction.csv', 'w', newline='') as f:
         if long_prob < bottom_bound:
             _class = 'S'
 
-        _1w_px = get_price(raw_data, ticker_idx, ONE_WEEK_RETURN_IDX, PxType.CLOSE, ADJ_PX)
-        _1d_px = get_price(raw_data, ticker_idx, ONE_DAY_RETURN_IDX, PxType.CLOSE, ADJ_PX)
-        _pred_px = get_price(raw_data, ticker_idx, PREDICTION_DATE_IDX, PxType.CLOSE, ADJ_PX)
-        _hp_px = get_price(raw_data, ticker_idx, HPR_DATE_IDX, PxType.CLOSE, ADJ_PX)
+        _1w_px = get_price(raw_data, ticker_idx, ONE_WEEK_RETURN_IDX, PxType.CLOSE)
+        _1d_px = get_price(raw_data, ticker_idx, ONE_DAY_RETURN_IDX, PxType.CLOSE)
+        _pred_px = get_price(raw_data, ticker_idx, PREDICTION_DATE_IDX, PxType.CLOSE)
+        _hp_px = get_price(raw_data, ticker_idx, HPR_DATE_IDX, PxType.CLOSE)
 
         _open_px = get_price(raw_data, ticker_idx, HPR_DATE_IDX,
-                             PxType.CLOSE if OPEN_POS_DATE <= PREDICTION_DATE else PxType.OPEN, ADJ_PX)
+                             PxType.CLOSE if OPEN_POS_DATE <= PREDICTION_DATE else PxType.OPEN)
 
-        _week_gross_volume = raw_data[ticker_idx, d_r_i[1:], DATA_CLOSE_IDX] * raw_data[
-            ticker_idx, d_r_i[1:], DATA_VOLUME_IDX]
+        _week_gross_volume = raw_data[ticker_idx, d_r_i[1:], DATA_TO_IDX]
         _last_day_gross_volume = _week_gross_volume[4]
         _week_avg_gross_volume = np.average(_week_gross_volume)
 

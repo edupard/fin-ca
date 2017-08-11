@@ -4,8 +4,7 @@ import datetime
 import numpy as np
 import csv
 
-df = read_csv('data/prices_CSL.csv')
-# df = read_csv('data/prices_history.csv')
+df = read_csv('data/prices.csv')
 
 def check_prices_same(px1 , px2):
     if px2 > 0:

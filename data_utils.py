@@ -4,22 +4,16 @@ import numpy as np
 from pandas import read_csv
 from enum import Enum
 
-CAP = 50
-
 DATA_OPEN_IDX = 0
 DATA_HIGH_IDX = 1
 DATA_LOW_IDX = 2
 DATA_CLOSE_IDX = 3
 DATA_VOLUME_IDX = 4
-DATA_ADJ_OPEN_IDX = 5
-DATA_ADJ_HIGH_IDX = 6
-DATA_ADJ_LOW_IDX = 7
-DATA_ADJ_CLOSE_IDX = 8
+DATA_TO_IDX = 5
 
 
 def get_tradable_stocks_mask(raw_data):
     mask = np.all(raw_data > 0.0, axis=2)
-    # mask = raw_data[:, :, DATA_VOLUME_IDX] > 0.0 &
     return mask
 
 
@@ -62,7 +56,7 @@ def get_snp_mask(tickers, raw_data, start_date, end_date):
 
 
 def filter_activelly_tradeable_stocks(raw_data, DAY_TO_FILTER):
-    g_a = raw_data[:, :, DATA_VOLUME_IDX] * raw_data[:, :, DATA_CLOSE_IDX]
+    g_a = raw_data[:, :, DATA_TO_IDX]
     mask = g_a[:, :] > DAY_TO_FILTER
     return mask
 
@@ -148,7 +142,7 @@ def get_intermediate_dates(trading_day_mask, ent_r_i, ext_r_i):
 def get_top_tradable_stks(raw_data, trading_day_mask, s_i, e_i, limit):
     dts = get_intermediate_dates(trading_day_mask, s_i, e_i)
     raw_data = raw_data[:, dts, :]
-    g_a = raw_data[:, :, DATA_VOLUME_IDX] * raw_data[:, :, DATA_CLOSE_IDX]
+    g_a = raw_data[:, :, DATA_TO_IDX]
     avg_g_a = np.mean(g_a, axis=1)
     s_t_s_i = np.argsort(avg_g_a)
     t_s_i = s_t_s_i[-limit:]
@@ -157,7 +151,7 @@ def get_top_tradable_stks(raw_data, trading_day_mask, s_i, e_i, limit):
 def get_active_stks(raw_data, trading_day_mask, s_i, e_i, limit):
     dts = get_intermediate_dates(trading_day_mask, s_i, e_i)
     raw_data = raw_data[:, dts, :]
-    g_a = raw_data[:, :, DATA_VOLUME_IDX] * raw_data[:, :, DATA_CLOSE_IDX]
+    g_a = raw_data[:, :, DATA_TO_IDX]
     avg_g_a = np.mean(g_a, axis= 1)
     active_stk_mask = avg_g_a > limit
     t_s_i = np.where(active_stk_mask)[0]
@@ -181,32 +175,23 @@ class PxType(Enum):
     CLOSE = 3
 
 
-def get_price_idx(px_type: PxType, adj_px):
-    if adj_px:
-        type_to_idx = {
-            PxType.OPEN: DATA_ADJ_OPEN_IDX,
-            PxType.HIGH: DATA_ADJ_HIGH_IDX,
-            PxType.LOW: DATA_ADJ_LOW_IDX,
-            PxType.CLOSE: DATA_ADJ_CLOSE_IDX
-        }
-    else:
-        type_to_idx = {
-            PxType.OPEN: DATA_OPEN_IDX,
-            PxType.HIGH: DATA_HIGH_IDX,
-            PxType.LOW: DATA_LOW_IDX,
-            PxType.CLOSE: DATA_CLOSE_IDX
-        }
-
+def get_price_idx(px_type: PxType):
+    type_to_idx = {
+        PxType.OPEN: DATA_OPEN_IDX,
+        PxType.HIGH: DATA_HIGH_IDX,
+        PxType.LOW: DATA_LOW_IDX,
+        PxType.CLOSE: DATA_CLOSE_IDX
+    }
     return type_to_idx.get(px_type)
 
 
-def get_price(raw_data, s_i, r_i, px_type: PxType, adj_px):
-    px_idx = get_price_idx(px_type, adj_px)
+def get_price(raw_data, s_i, r_i, px_type: PxType):
+    px_idx = get_price_idx(px_type)
     return raw_data[s_i, r_i, px_idx]
 
 
-def get_prices(raw_data, t_s_i, r_i, px_type: PxType, adj_px):
-    px_idx = get_price_idx(px_type, adj_px)
+def get_prices(raw_data, t_s_i, r_i, px_type: PxType):
+    px_idx = get_price_idx(px_type)
     c = raw_data[:, r_i, :]
     c = c[t_s_i, :, :]
     c = c[:, :, px_idx]

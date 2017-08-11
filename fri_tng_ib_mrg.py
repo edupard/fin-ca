@@ -35,21 +35,24 @@ for ticker in adj_tickers:
         continue
 
     c = ib_ticker_df.iloc[0].c
-    adj_r = (c / (c + div)) / split
+    adj_div_r = c / (c + div)
+    adj_split_r = 1.0 / split
+    adj_r = adj_div_r * adj_split_r
     tng_df.loc[tng_df.ticker == ticker, 'adj_o'] *= adj_r
     tng_df.loc[tng_df.ticker == ticker, 'adj_c'] *= adj_r
     tng_df.loc[tng_df.ticker == ticker, 'adj_h'] *= adj_r
     tng_df.loc[tng_df.ticker == ticker, 'adj_l'] *= adj_r
+    tng_df.loc[tng_df.ticker == ticker, 'adj_v'] *= adj_r
 
 ib_df = ib_df[ib_df.ticker.isin(common_tickers)]
 ib_df['adj_o'] = ib_df.o
 ib_df['adj_c'] = ib_df.c
 ib_df['adj_h'] = ib_df.h
 ib_df['adj_l'] = ib_df.l
+ib_df['adj_v'] = ib_df.v
 ib_df['date'] = datetime.datetime.strftime(PREDICTION_DATE, '%Y-%m-%d')
 
-
 df = pd.concat([tng_df, ib_df], ignore_index=True)
-cols = ['ticker','date','o','c','h','l','v','adj_o','adj_c','adj_h','adj_l','div','split']
+cols = ['ticker', 'date', 'o', 'c', 'h', 'l', 'v', 'adj_o', 'adj_c', 'adj_h', 'adj_l', 'adj_v', 'div', 'split']
 df = df[cols]
 df.to_csv('data/history.csv', index=False)

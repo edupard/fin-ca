@@ -149,7 +149,7 @@ def preprocess_data(tickers, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME, us
     days = (END_DATE - START_DATE).days
     data_points = days + 1
 
-    raw_data = np.zeros((num_tickers, data_points, 9))
+    raw_data = np.zeros((num_tickers, data_points, 6))
     raw_dt = np.zeros((data_points))
     for idx in range(data_points):
         date = START_DATE + datetime.timedelta(days=idx)

@@ -2,7 +2,6 @@ import datetime
 
 import numpy as np
 import matplotlib.pyplot as plt
-from enum import Enum
 import csv
 
 from tickers import get_nyse_nasdaq_tickers, get_nyse_tickers, get_nasdaq_tickers
@@ -14,91 +13,24 @@ from download_utils import load_npz_data, load_npz_data_alt
 from visualization import wealth_graph, confusion_matrix, wealth_csv, calc_wealth
 from visualization import plot_20_random_stock_prices, plot_traded_stocks_per_day
 from nn import train_ae, train_ffnn, train_rbm, evaluate_ffnn
-from date_range import HIST_BEG, HIST_END
-
-NUM_WEEKS = 12
-NUM_DAYS = 5
-
-ENT_ON_MON = False
-ENT_MON_OPEN = True
-EXIT_ON_MON = False
-EXIT_ON_MON_OPEN = True
-
-
-class SelectionAlgo(Enum):
-    TOP = 0
-    BOTTOM = 1
-    MIDDLE = 2
-    MIDDLE_ALT = 3
-
-
-class SelectionType(Enum):
-    PCT = 0
-    FIXED = 1
-
-
-class StopLossType(Enum):
-    NO = 0
-    EOD = 1
-    LB = 2
-    STOCK = 3
-
-
-ADJ_PX = True
-
-SLCT_TYPE = SelectionType.FIXED
-# SLCT_VAL = 4
-SLCT_VAL = 30
-
-SLCT_PCT = 100
-SLCT_ALG = SelectionAlgo.TOP
-
-# STOP_LOSS_HPR = -0.19
-# STOP_LOSS_TYPE = StopLossType.NO
-
-STOP_LOSS_HPR = -0.12
-STOP_LOSS_TYPE = StopLossType.NO
-
-GRID_SEARCH = True
-
-MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 10
-
-MIN_SELECTION_FILTER = False
-MIN_SELECTION_STOCKS = 100
-
-AVG_DAY_TO_FILTER = False
-AVG_DAY_TO_LIMIT = 10000000
-TOP_TRADABLE_FILTER = True
-TOP_TRADABLE_STOCKS = 500
-DAY_TO_FILTER = False
-DAY_TO_LIMIT = 10000000
+from config import get_config, SelectionType, SelectionAlgo, StopLossType
 
 tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq.npz')
-# tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq_adj.npz')
 
 raw_mpl_dt = convert_to_mpl_time(raw_dt)
 
-actively_tradeable_mask = filter_activelly_tradeable_stocks(raw_data, DAY_TO_FILTER)
+actively_tradeable_mask = filter_activelly_tradeable_stocks(raw_data, get_config().DAY_TO_LIMIT)
 
 tradable_mask = get_tradable_stocks_mask(raw_data)
 tradable_stocks_per_day = tradable_mask[:, :].sum(0)
-trading_day_mask = tradable_stocks_per_day > MIN_STOCKS_TRADABLE_PER_TRADING_DAY
+trading_day_mask = tradable_stocks_per_day > get_config().MIN_STOCKS_TRADABLE_PER_TRADING_DAY
 
-snp_mask = get_snp_mask(tickers, raw_data, HIST_BEG, HIST_END)
+snp_mask = get_snp_mask(tickers, raw_data, get_config().HIST_BEG, get_config().HIST_END)
 
 # plot_20_random_stock_prices(raw_data, raw_mpl_dt)
 # plot_traded_stocks_per_day(tradable_stocks_per_day, raw_mpl_dt)
 
-TRAIN_BEG = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
-TRAIN_END = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
-# TRAIN_END = HIST_END
-
-CV_BEG = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
-CV_END = HIST_END
-# CV_BEG = TRAIN_BEG
-# CV_END = TRAIN_END
-
-SUNDAY = TRAIN_BEG + datetime.timedelta(days=7 - TRAIN_BEG.isoweekday())
+SUNDAY = get_config().HIST_BEG + datetime.timedelta(days=7 - get_config().HIST_BEG.isoweekday())
 
 cv_beg_idx = None
 cv_end_idx = None
@@ -169,56 +101,55 @@ def update_indexes():
     global tr_wk_beg_idx
     global tr_wk_end_idx
 
-    if SUNDAY >= TRAIN_BEG and SUNDAY <= TRAIN_END:
+    if SUNDAY >= get_config().TRAIN_BEG and SUNDAY <= get_config().TRAIN_END:
         if tr_beg_idx is None:
             tr_beg_idx = data_set_records
         if tr_wk_beg_idx is None:
             tr_wk_beg_idx = total_weeks
 
-    if SUNDAY > TRAIN_END:
+    if SUNDAY > get_config().TRAIN_END:
         if tr_end_idx is None:
             tr_end_idx = data_set_records
         if tr_wk_end_idx is None:
             tr_wk_end_idx = total_weeks
 
-    if SUNDAY >= CV_BEG and SUNDAY <= CV_END:
+    if SUNDAY >= get_config().CV_BEG and SUNDAY <= get_config().CV_END:
         if cv_beg_idx is None:
             cv_beg_idx = data_set_records
         if cv_wk_beg_idx is None:
             cv_wk_beg_idx = total_weeks
 
-    if SUNDAY > CV_END:
+    if SUNDAY > get_config().CV_END:
         if cv_end_idx is None:
             cv_end_idx = data_set_records
         if cv_wk_end_idx is None:
             cv_wk_end_idx = total_weeks
 
-
 while True:
     # iterate over weeks
     SUNDAY = SUNDAY + datetime.timedelta(days=7)
     # break when all availiable data processed
-    if SUNDAY > HIST_END:
+    if SUNDAY > get_config().HIST_END:
         break
-    w_r_i = get_dates_for_weekly_return(HIST_BEG, HIST_END, trading_day_mask, SUNDAY, NUM_WEEKS + 1)
+    w_r_i = get_dates_for_weekly_return(get_config().HIST_BEG, get_config().HIST_END, trading_day_mask, SUNDAY, get_config().NUM_WEEKS + 1)
     # continue if all data not availiable yet
     if w_r_i is None:
         continue
-    d_r_i = get_dates_for_daily_return(HIST_BEG, HIST_END, trading_day_mask, SUNDAY - datetime.timedelta(days=7),
-                                       NUM_DAYS)
+    d_r_i = get_dates_for_daily_return(get_config().HIST_BEG, get_config().HIST_END, trading_day_mask, SUNDAY - datetime.timedelta(days=7),
+                                       get_config().NUM_DAYS)
     # continue if all data not availiable yet
     if d_r_i is None:
         continue
-    if ENT_ON_MON:
-        ent_r_i = get_one_trading_date(HIST_BEG, HIST_END, trading_day_mask,
+    if get_config().ENT_ON_MON:
+        ent_r_i = get_one_trading_date(get_config().HIST_BEG, get_config().HIST_END, trading_day_mask,
                                        SUNDAY - datetime.timedelta(days=7) + datetime.timedelta(days=1))
         if ent_r_i is None:
             continue
     else:
         ent_r_i = d_r_i[-1:]
 
-    if EXIT_ON_MON:
-        ext_r_i = get_one_trading_date(HIST_BEG, HIST_END, trading_day_mask,
+    if get_config().EXIT_ON_MON:
+        ext_r_i = get_one_trading_date(get_config().HIST_BEG, get_config().HIST_END, trading_day_mask,
                                        SUNDAY + datetime.timedelta(days=1))
         if ext_r_i is None:
             continue
@@ -229,13 +160,13 @@ while True:
     # stocks should be tradeable on all dates we need for calcs
     t_s_i = get_tradable_stock_indexes(tradable_mask, w_r_i + d_r_i + ent_r_i + ext_r_i + tw_r_i)
 
-    if AVG_DAY_TO_FILTER:
-        a_s_i = get_active_stks(raw_data, trading_day_mask, w_r_i[0], d_r_i[-1], AVG_DAY_TO_LIMIT)
+    if get_config().AVG_DAY_TO_LIMIT is not None:
+        a_s_i = get_active_stks(raw_data, trading_day_mask, w_r_i[0], d_r_i[-1], get_config().AVG_DAY_TO_LIMIT)
         t_s_i = np.intersect1d(t_s_i, a_s_i)
-    if TOP_TRADABLE_FILTER:
-        t_t_s_i = get_top_tradable_stks(raw_data, trading_day_mask, w_r_i[0], d_r_i[-1], TOP_TRADABLE_STOCKS)
+    if get_config().TOP_TRADABLE_STOCKS is not None:
+        t_t_s_i = get_top_tradable_stks(raw_data, trading_day_mask, w_r_i[0], d_r_i[-1], get_config().TOP_TRADABLE_STOCKS)
         t_s_i = np.intersect1d(t_s_i, t_t_s_i)
-    if DAY_TO_FILTER:
+    if get_config().DAY_TO_LIMIT is not None:
         a_t_s_i = get_tradable_stock_indexes(actively_tradeable_mask, w_r_i[:-1] + d_r_i)
         t_s_i = np.intersect1d(t_s_i, a_t_s_i)
 
@@ -244,73 +175,49 @@ while True:
     #
     # print("new: %d vs old: %d" % (t_s_i.shape[0], t_s_i_old.shape[0]))
 
-    if MIN_SELECTION_FILTER and t_s_i.shape[0] < MIN_SELECTION_STOCKS:
-        continue
+    if get_config().MIN_SELECTION_STOCKS is not None:
+        if t_s_i.shape[0] < get_config().MIN_SELECTION_STOCKS:
+            continue
 
-    d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE, ADJ_PX)
-    w_c = get_prices(raw_data, t_s_i, w_r_i, PxType.CLOSE, ADJ_PX)
-
-    # exit_date = datetime.datetime.fromtimestamp(raw_dt[ext_r_i[0]]).date()
-    # if exit_date == datetime.datetime.strptime('2017-07-07', '%Y-%m-%d').date():
-    #     with open('data/test_analyze.csv', 'w', newline='') as f:
-    #         writer = csv.writer(f)
-    #         row = ['ticker']
-    #         for dt_idx in w_r_i[:-1]:
-    #             dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
-    #             row.append(dt.strftime('%Y-%m-%d'))
-    #         for dt_idx in d_r_i:
-    #             dt = datetime.datetime.fromtimestamp(raw_dt[dt_idx])
-    #             row.append(dt.strftime('%Y-%m-%d'))
-    #         writer.writerow(row)
-    #
-    #         idx = 0
-    #         for ticker_idx in t_s_i:
-    #             ticker = tickers[ticker_idx]
-    #             row = []
-    #             row.append(ticker)
-    #             for v in w_c[idx, :-1]:
-    #                 row.append(v)
-    #             for v in d_c[idx, :]:
-    #                 row.append(v)
-    #             writer.writerow(row)
-    #             idx += 1
+    d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE)
+    w_c = get_prices(raw_data, t_s_i, w_r_i, PxType.CLOSE)
 
     px_type = PxType.CLOSE
-    if ENT_ON_MON and ENT_MON_OPEN:
+    if get_config().ENT_ON_MON and get_config().ENT_MON_OPEN:
         px_type = PxType.OPEN
-    ent_px = get_prices(raw_data, t_s_i, ent_r_i, px_type, ADJ_PX)
+    ent_px = get_prices(raw_data, t_s_i, ent_r_i, px_type)
     px_type = PxType.CLOSE
-    if EXIT_ON_MON and EXIT_ON_MON_OPEN:
+    if get_config().EXIT_ON_MON and get_config().EXIT_ON_MON_OPEN:
         px_type = PxType.OPEN
-    ext_px = get_prices(raw_data, t_s_i, ext_r_i, px_type, ADJ_PX)
+    ext_px = get_prices(raw_data, t_s_i, ext_r_i, px_type)
 
     # calc daily returns
     d_n_r = calc_z_score(d_c)
     w_n_r = calc_z_score(w_c[:, :-1])
 
-    _s_hpr = (w_c[:, NUM_WEEKS + 1] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
+    _s_hpr = (w_c[:, get_config().NUM_WEEKS + 1] - w_c[:, get_config().NUM_WEEKS]) / w_c[:, get_config().NUM_WEEKS]
     _s_hpr_model = (ext_px[:, 0] - ent_px[:, 0]) / ent_px[:, 0]
 
-    tw_s_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.CLOSE, ADJ_PX)
+    tw_s_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.CLOSE)
     _t_w_s_hpr = ((tw_s_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
 
-    tw_s_h_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.HIGH, ADJ_PX)
+    tw_s_h_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.HIGH)
     _t_w_s_h_hpr = ((tw_s_h_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
 
-    tw_s_o_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.OPEN, ADJ_PX)
+    tw_s_o_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.OPEN)
     _t_w_s_o_hpr = ((tw_s_o_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
 
-    tw_s_l_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.LOW, ADJ_PX)
+    tw_s_l_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.LOW)
     _t_w_s_l_hpr = ((tw_s_l_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
 
-    _s_int_r = (ent_px[:, 0] - w_c[:, NUM_WEEKS]) / w_c[:, NUM_WEEKS]
+    _s_int_r = (ent_px[:, 0] - w_c[:, get_config().NUM_WEEKS]) / w_c[:, get_config().NUM_WEEKS]
 
     hpr_med = np.median(_s_hpr)
     _c_l = _s_hpr >= hpr_med
     _c_s = ~_c_l
 
-    enter_date_idx = w_r_i[NUM_WEEKS]
-    exit_date_idx = w_r_i[NUM_WEEKS + 1]
+    enter_date_idx = w_r_i[get_config().NUM_WEEKS]
+    exit_date_idx = w_r_i[get_config().NUM_WEEKS + 1]
 
     # sample size
     num_stocks = t_s_i.shape[0]
@@ -407,13 +314,13 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _s_c_l |= pred_long_cond
         _s_c_s |= ~pred_long_cond
 
-        if SLCT_TYPE == SelectionType.PCT:
-            top_bound = np.percentile(_prob_l, 100 - SLCT_VAL)
-            bottom_bound = np.percentile(_prob_l, SLCT_VAL)
+        if get_config().SLCT_TYPE == SelectionType.PCT:
+            top_bound = np.percentile(_prob_l, 100 - get_config().SLCT_VAL)
+            bottom_bound = np.percentile(_prob_l, get_config().SLCT_VAL)
         else:
             _prob_l_sorted = np.sort(_prob_l)
-            bottom_bound = _prob_l_sorted[SLCT_VAL - 1]
-            top_bound = _prob_l_sorted[-SLCT_VAL]
+            bottom_bound = _prob_l_sorted[get_config().SLCT_VAL - 1]
+            top_bound = _prob_l_sorted[-get_config().SLCT_VAL]
 
         _s_s_l = s_l[beg: end]
         _s_s_s = s_s[beg: end]
@@ -425,25 +332,25 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         l_s_int_r = _int_r[_s_s_l]
         s_s_int_r = _int_r[_s_s_s]
 
-        if SLCT_ALG == SelectionAlgo.TOP:
+        if get_config().SLCT_ALG == SelectionAlgo.TOP:
             l_int_r_t_b = np.max(l_s_int_r)
-            l_int_r_b_b = np.percentile(l_s_int_r, 100 - SLCT_PCT)
-        elif SLCT_ALG == SelectionAlgo.BOTTOM:
-            l_int_r_t_b = np.percentile(l_s_int_r, SLCT_PCT)
+            l_int_r_b_b = np.percentile(l_s_int_r, 100 - get_config().SLCT_PCT)
+        elif get_config().SLCT_ALG == SelectionAlgo.BOTTOM:
+            l_int_r_t_b = np.percentile(l_s_int_r, get_config().SLCT_PCT)
             l_int_r_b_b = np.min(l_s_int_r)
-        elif SLCT_ALG == SelectionAlgo.MIDDLE:
-            l_int_r_t_b = np.percentile(l_s_int_r, 100 - SLCT_PCT / 2)
-            l_int_r_b_b = np.percentile(l_s_int_r, SLCT_PCT / 2)
+        elif get_config().SLCT_ALG == SelectionAlgo.MIDDLE:
+            l_int_r_t_b = np.percentile(l_s_int_r, 100 - get_config().SLCT_PCT / 2)
+            l_int_r_b_b = np.percentile(l_s_int_r, get_config().SLCT_PCT / 2)
 
-        if SLCT_ALG == SelectionAlgo.TOP:
-            s_int_r_t_b = np.percentile(s_s_int_r, SLCT_PCT)
+        if get_config().SLCT_ALG == SelectionAlgo.TOP:
+            s_int_r_t_b = np.percentile(s_s_int_r, get_config().SLCT_PCT)
             s_int_r_b_b = np.min(s_s_int_r)
-        elif SLCT_ALG == SelectionAlgo.BOTTOM:
+        elif get_config().SLCT_ALG == SelectionAlgo.BOTTOM:
             s_int_r_t_b = np.max(s_s_int_r)
-            s_int_r_b_b = np.percentile(s_s_int_r, 100 - SLCT_PCT)
-        elif SLCT_ALG == SelectionAlgo.MIDDLE:
-            s_int_r_t_b = np.percentile(s_s_int_r, 100 - SLCT_PCT / 2)
-            s_int_r_b_b = np.percentile(s_s_int_r, SLCT_PCT / 2)
+            s_int_r_b_b = np.percentile(s_s_int_r, 100 - get_config().SLCT_PCT)
+        elif get_config().SLCT_ALG == SelectionAlgo.MIDDLE:
+            s_int_r_t_b = np.percentile(s_s_int_r, 100 - get_config().SLCT_PCT / 2)
+            s_int_r_b_b = np.percentile(s_s_int_r, get_config().SLCT_PCT / 2)
 
         sel_l_cond = _s_s_l
         sel_l_cond &= _int_r >= l_int_r_b_b
@@ -526,7 +433,7 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
             # calc portfolio string
             _s_longs = ""
             _s_shorts = ""
-            if not GRID_SEARCH:
+            if not get_config().GRID_SEARCH:
                 idx = 0
                 for _stock_idx in _l_stocks:
                     if _s_longs != "":
@@ -591,7 +498,7 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _t_w_l_s_hpr_mean = np.mean(_t_w_l_s_hpr, axis=0)
         _t_w_s_s_hpr_mean = np.mean(_t_w_s_s_hpr, axis=0)
         _t_w_hpr = (_t_w_l_s_hpr_mean - _t_w_s_s_hpr_mean) / 2
-        sl_idxs = np.nonzero(_t_w_hpr <= STOP_LOSS_HPR)
+        sl_idxs = np.nonzero(_t_w_hpr <= get_config().STOP_LOSS_HPR)
         _ext_idx = _default_ext_idx
         _stop = False
         if sl_idxs[0].shape[0] > 0:
@@ -636,14 +543,14 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _t_w_s_s_o_hpr_mean = np.mean(_t_w_s_s_o_hpr, axis=0)
         _t_w_o_hpr = (_t_w_l_s_o_hpr_mean - _t_w_s_s_o_hpr_mean) / 2
 
-        sl_idxs = np.nonzero(_t_w_lb_hpr <= STOP_LOSS_HPR)
+        sl_idxs = np.nonzero(_t_w_lb_hpr <= get_config().STOP_LOSS_HPR)
         _ext_idx = _t_w_eod_num - 1
         _stop = False
         _stop_on_open = False
         if sl_idxs[0].shape[0] > 0:
             _ext_idx = sl_idxs[0][0]
             _stop = True
-            if _t_w_o_hpr[_ext_idx] <= STOP_LOSS_HPR:
+            if _t_w_o_hpr[_ext_idx] <= get_config().STOP_LOSS_HPR:
                 _stop_on_open = True
 
         _s_l_ext_idx = np.full(_l_stocks.shape, _ext_idx)
@@ -655,8 +562,8 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
                 _s_l_ext_hpr = _t_w_l_s_o_hpr[:,_ext_idx]
                 _s_s_ext_hpr = _t_w_s_s_o_hpr[:,_ext_idx]
             else:
-                _s_l_ext_hpr = np.full(_l_stocks.shape, STOP_LOSS_HPR)
-                _s_s_ext_hpr = np.full(_s_stocks.shape, -STOP_LOSS_HPR)
+                _s_l_ext_hpr = np.full(_l_stocks.shape, get_config().STOP_LOSS_HPR)
+                _s_s_ext_hpr = np.full(_s_stocks.shape, -get_config().STOP_LOSS_HPR)
         else:
             _s_l_ext_hpr = _t_w_l_s_hpr[:, _ext_idx]
             _s_s_ext_hpr = _t_w_s_s_hpr[:, _ext_idx]
@@ -697,7 +604,7 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         # _t_w_l_s_o_hpr = _t_w_s_s_o_hpr[sel_l_cond, :]
         # _t_w_s_s_o_hpr = _t_w_s_s_o_hpr[sel_s_cond, :]
         # long
-        _s_l_stop_mask = _t_w_l_s_lb_hpr <= STOP_LOSS_HPR
+        _s_l_stop_mask = _t_w_l_s_lb_hpr <= get_config().STOP_LOSS_HPR
         _s_l_stop = np.any(_s_l_stop_mask, axis=1)
         _s_l_ext_idx = first_true_idx_by_row(_s_l_stop_mask, _default_ext_idx)
         # by default ext hpr == hpr no sl
@@ -713,14 +620,14 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         # hpr for stocks with sl by open px
         _l_s_sl_o_hrp = _aaa[_xxx, _yyy]
         # condition
-        _use_o_px = _l_s_sl_o_hrp <= STOP_LOSS_HPR
+        _use_o_px = _l_s_sl_o_hrp <= get_config().STOP_LOSS_HPR
         # stock with sl hpr
-        _s_l_sl_hpr = np.where(_use_o_px, _l_s_sl_o_hrp, STOP_LOSS_HPR)
+        _s_l_sl_hpr = np.where(_use_o_px, _l_s_sl_o_hrp, get_config().STOP_LOSS_HPR)
         # override default hpr for stocks with sl
         _s_l_ext_hpr[_s_l_stop] = _s_l_sl_hpr
 
         # short
-        _s_s_stop_mask = _t_w_s_s_lb_hpr >= -STOP_LOSS_HPR
+        _s_s_stop_mask = _t_w_s_s_lb_hpr >= -get_config().STOP_LOSS_HPR
         _s_s_stop = np.any(_s_s_stop_mask, axis=1)
         _s_s_ext_idx = first_true_idx_by_row(_s_s_stop_mask, _default_ext_idx)
 
@@ -737,9 +644,9 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         # hpr for stocks with sl by open px
         _s_s_sl_o_hrp = _aaa[_xxx, _yyy]
         # condition
-        _use_o_px = _s_s_sl_o_hrp >= -STOP_LOSS_HPR
+        _use_o_px = _s_s_sl_o_hrp >= -get_config().STOP_LOSS_HPR
         # stock with sl hpr
-        _s_s_sl_hpr = np.where(_use_o_px, _s_s_sl_o_hrp, -STOP_LOSS_HPR)
+        _s_s_sl_hpr = np.where(_use_o_px, _s_s_sl_o_hrp, -get_config().STOP_LOSS_HPR)
         # override default hpr for stocks with sl
         _s_s_ext_hpr[_s_s_stop] = _s_s_sl_hpr
 
@@ -784,7 +691,7 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
            model_s_sl
 
 
-if GRID_SEARCH:
+if get_config().GRID_SEARCH:
     with open('./data/grid_search.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(
@@ -805,10 +712,6 @@ if GRID_SEARCH:
                 'recap wealth',
                 'recap max dd'
             ))
-
-        SLCT_TYPE = SelectionType.FIXED
-        SLCT_VAL = 2
-        STOP_LOSS_HPR = -0.05
 
 
         def print_rows_for_fixed_params():
@@ -836,9 +739,9 @@ if GRID_SEARCH:
                 writer.writerow(
                     (
                         sl_name,
-                        "%f" % STOP_LOSS_HPR,
-                        SLCT_VAL,
-                        'pct' if SLCT_TYPE == SelectionType.PCT else 'fixed',
+                        "%f" % get_config().STOP_LOSS_HPR,
+                        get_config().SLCT_VAL,
+                        'pct' if get_config().SLCT_TYPE == SelectionType.PCT else 'fixed',
                         wealth[-1],
                         "%f" % min_min_w_eod,
                         "%f" % min_min_w_lb,
@@ -859,19 +762,19 @@ if GRID_SEARCH:
 
 
         # grid search
-        SLCT_TYPE = SelectionType.FIXED
-        for SLCT_VAL in range(1, 40):
-            print("FIXED %d" % SLCT_VAL)
+        get_config().SLCT_TYPE = SelectionType.FIXED
+        for get_config().SLCT_VAL in range(1, 40):
+            print("FIXED %d" % get_config().SLCT_VAL)
             # for STOP_LOSS_HPR in np.linspace(-0.01, -0.30, 29 * 2 + 1):
-            #     print("SL %.2f" % STOP_LOSS_HPR)
+            #     print("SL %.2f" % get_config().STOP_LOSS_HPR)
             #     print_rows_for_fixed_params()
             # no sl grid search
-            STOP_LOSS_HPR = 0.0
-            print("SL %.2f" % STOP_LOSS_HPR)
+            get_config().STOP_LOSS_HPR = 0.0
+            print("SL %.2f" % get_config().STOP_LOSS_HPR)
             print_rows_for_fixed_params()
-        # SLCT_TYPE = SelectionType.PCT
-        # for SLCT_VAL in np.linspace(0.5, 15, 15 * 2):
-        #     for STOP_LOSS_HPR in np.linspace(-0.01, -0.50, 49 * 2 + 1):
+        # get_config().SLCT_TYPE = SelectionType.PCT
+        # for get_config().SLCT_VAL in np.linspace(0.5, 15, 15 * 2):
+        #     for get_config().STOP_LOSS_HPR in np.linspace(-0.01, -0.50, 49 * 2 + 1):
         #         print_rows_for_fixed_params()
 
 else:
@@ -906,7 +809,7 @@ else:
         StopLossType.STOCK: model_s_sl
     }
 
-    model = type_to_idx.get(STOP_LOSS_TYPE, model_no_sl)
+    model = type_to_idx.get(get_config().STOP_LOSS_TYPE, model_no_sl)
     model_hpr, model_min_w_eod_hpr, model_min_w_lb_hpr, model_l_stops, model_s_stops, model_l_port, model_s_port = model
 
     wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(model_hpr[cv_wk_beg_idx:cv_wk_end_idx],

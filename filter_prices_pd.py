@@ -3,12 +3,12 @@ from pandas import read_csv
 import datetime
 import numpy as np
 import csv
-from date_range import HIST_BEG, HIST_END
+from config import get_config
 
 # DATE_BEG = datetime.datetime.strptime('2017-03-24', '%Y-%m-%d').date()
 # DATE_END = datetime.datetime.strptime('2017-06-30', '%Y-%m-%d').date()
-DATE_BEG = HIST_BEG
-DATE_END = HIST_END
+DATE_BEG = get_config().HIST_BEG
+DATE_END = get_config().HIST_END
 
 df = read_csv('data/prices_append.csv')
 tickers = ['UONE']
