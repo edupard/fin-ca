@@ -4,13 +4,10 @@ from download_utils import preprocess_data
 
 
 tickers = get_nasdaq_tickers()
-preprocess_data(tickers, "data/prices_latest.csv", HIST_BEG, HIST_END, "data/nasdaq.npz", False)
-# preprocess_data(tickers, "data/prices.csv", HIST_BEG, HIST_END, "data/nasdaq_adj.npz", True)
+preprocess_data(tickers, "data/prices.csv", HIST_BEG, HIST_END, "data/nasdaq.npz", True)
 
-# tickers = get_nyse_tickers()
-# preprocess_data_alt(tickers, "data/prices.csv", HIST_BEG, HIST_END, "data/nyse.npz", False)
-# preprocess_data_alt(tickers, "data/prices.csv", HIST_BEG, HIST_END, "data/nyse_adj.npz", True)
-#
-# tickers = get_nyse_nasdaq_tickers()
-# preprocess_data_alt(tickers, "data/prices.csv", HIST_BEG, HIST_END, "data/nyse_nasdaq.npz", False)
-# preprocess_data_alt(tickers, "data/prices.csv", HIST_BEG, HIST_END, "data/nyse_nasdaq_adj.npz", True)
+tickers = get_nyse_tickers()
+preprocess_data(tickers, "data/prices.csv", HIST_BEG, HIST_END, "data/nyse.npz", True)
+
+tickers = get_nyse_nasdaq_tickers()
+preprocess_data(tickers, "data/prices.csv", HIST_BEG, HIST_END, "data/nyse_nasdaq.npz", True)

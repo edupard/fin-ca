@@ -37,7 +37,7 @@ class Writer:
         print('downloading data...')
         with open(self.FILE_NAME, 'w', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow(('ticker', 'date', 'o', 'c', 'h', 'l', 'v', 'adj_o', 'adj_c', 'adj_h', 'adj_l', 'div', 'split'))
+            writer.writerow(('ticker', 'date', 'o', 'c', 'h', 'l', 'v', 'adj_o', 'adj_c', 'adj_h', 'adj_l', 'adj_v', 'div', 'split'))
             while True:
                 p = self.queue.get()
                 if p.payload_type == PayloadType.TASK_COMPLETED:
@@ -56,15 +56,12 @@ class Writer:
                             adj_c = d['adjClose']
                             adj_h = d['adjHigh']
                             adj_l = d['adjLow']
+                            adj_v = d['adjVolume']
                             div_cash = d['divCash']
                             split_factor = d['splitFactor']
-
-                            volume = float(v)
-                            # if volume == 0:
-                            #     continue
                             dt = d['date'].split("T")[0]
                             t = p.ticker
-                            writer.writerow((t, dt, o, c, h, l, v, adj_o, adj_c, adj_h, adj_l, div_cash, split_factor))
+                            writer.writerow((t, dt, o, c, h, l, v, adj_o, adj_c, adj_h, adj_l, adj_v, div_cash, split_factor))
                     except:
                         pass
         print('download completed!')
@@ -193,18 +190,25 @@ def preprocess_data(tickers, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME, us
                 a_c = float(row[8])
                 a_h = float(row[9])
                 a_l = float(row[10])
-                # d_c = float(row[11])
-                # s_f = float(row[12])
+                a_v = float(row[11])
+                # d_c = float(row[12])
+                # s_f = float(row[13])
+                to = v * c
 
-                raw_data[ticker_idx, dt_idx, 0] = o
-                raw_data[ticker_idx, dt_idx, 1] = h
-                raw_data[ticker_idx, dt_idx, 2] = l
-                raw_data[ticker_idx, dt_idx, 3] = c
-                raw_data[ticker_idx, dt_idx, 4] = v
-                raw_data[ticker_idx, dt_idx, 5] = a_o
-                raw_data[ticker_idx, dt_idx, 6] = a_h
-                raw_data[ticker_idx, dt_idx, 7] = a_l
-                raw_data[ticker_idx, dt_idx, 8] = a_c
+                if use_adj_px:
+                    raw_data[ticker_idx, dt_idx, 0] = a_o
+                    raw_data[ticker_idx, dt_idx, 1] = a_h
+                    raw_data[ticker_idx, dt_idx, 2] = a_l
+                    raw_data[ticker_idx, dt_idx, 3] = a_c
+                    raw_data[ticker_idx, dt_idx, 4] = a_v
+                    raw_data[ticker_idx, dt_idx, 5] = to
+                else:
+                    raw_data[ticker_idx, dt_idx, 0] = o
+                    raw_data[ticker_idx, dt_idx, 1] = h
+                    raw_data[ticker_idx, dt_idx, 2] = l
+                    raw_data[ticker_idx, dt_idx, 3] = c
+                    raw_data[ticker_idx, dt_idx, 4] = v
+                    raw_data[ticker_idx, dt_idx, 5] = to
             except:
                 pass
 

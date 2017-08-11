@@ -1,5 +1,4 @@
 import datetime
-from _lsprof import profiler_entry
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -48,26 +47,30 @@ class StopLossType(Enum):
 ADJ_PX = True
 
 SLCT_TYPE = SelectionType.FIXED
-SLCT_VAL = 4
+# SLCT_VAL = 4
+SLCT_VAL = 30
 
 SLCT_PCT = 100
 SLCT_ALG = SelectionAlgo.TOP
 
-STOP_LOSS_HPR = -0.19
-STOP_LOSS_TYPE = StopLossType.STOCK
+# STOP_LOSS_HPR = -0.19
+# STOP_LOSS_TYPE = StopLossType.NO
 
-GRID_SEARCH = False
+STOP_LOSS_HPR = -0.12
+STOP_LOSS_TYPE = StopLossType.NO
+
+GRID_SEARCH = True
 
 MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 10
 
-MIN_SELECTION_FILTER = True
+MIN_SELECTION_FILTER = False
 MIN_SELECTION_STOCKS = 100
 
 AVG_DAY_TO_FILTER = False
 AVG_DAY_TO_LIMIT = 10000000
-TOP_TRADABLE_FILTER = False
-TOP_TRADABLE_STOCKS = 100
-DAY_TO_FILTER = True
+TOP_TRADABLE_FILTER = True
+TOP_TRADABLE_STOCKS = 500
+DAY_TO_FILTER = False
 DAY_TO_LIMIT = 10000000
 
 tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq.npz')
@@ -87,14 +90,13 @@ snp_mask = get_snp_mask(tickers, raw_data, HIST_BEG, HIST_END)
 # plot_traded_stocks_per_day(tradable_stocks_per_day, raw_mpl_dt)
 
 TRAIN_BEG = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
-# TRAIN_END = HIST_END
 TRAIN_END = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
-# TRAIN_END = datetime.datetime.strptime('2015-01-01', '%Y-%m-%d').date()
-# TRAIN_END = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
+# TRAIN_END = HIST_END
 
-# CV_BEG = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
-CV_BEG = HIST_BEG
+CV_BEG = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
 CV_END = HIST_END
+# CV_BEG = TRAIN_BEG
+# CV_END = TRAIN_END
 
 SUNDAY = TRAIN_BEG + datetime.timedelta(days=7 - TRAIN_BEG.isoweekday())
 
@@ -116,6 +118,7 @@ wr = None
 t_w_s_hpr = None
 t_w_s_h_hpr = None
 t_w_s_l_hpr = None
+t_w_s_o_hpr = None
 t_w_eod_num = None
 t_w_eods = None
 s_hpr = None
@@ -294,6 +297,9 @@ while True:
     tw_s_h_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.HIGH, ADJ_PX)
     _t_w_s_h_hpr = ((tw_s_h_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
 
+    tw_s_o_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.OPEN, ADJ_PX)
+    _t_w_s_o_hpr = ((tw_s_o_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
+
     tw_s_l_px = get_prices(raw_data, t_s_i, tw_r_i, PxType.LOW, ADJ_PX)
     _t_w_s_l_hpr = ((tw_s_l_px.transpose() - ent_px[:, 0]) / ent_px[:, 0]).transpose()
 
@@ -318,6 +324,7 @@ while True:
     _t_w_eods = np.array(tw_r_i).reshape((1, -1))
     t_w_eods = append_data_and_pad_with_zeros(t_w_eods, _t_w_eods)
     t_w_s_hpr = append_data_and_pad_with_zeros(t_w_s_hpr, _t_w_s_hpr)
+    t_w_s_o_hpr = append_data_and_pad_with_zeros(t_w_s_o_hpr, _t_w_s_o_hpr)
     t_w_s_h_hpr = append_data_and_pad_with_zeros(t_w_s_h_hpr, _t_w_s_h_hpr)
     t_w_s_l_hpr = append_data_and_pad_with_zeros(t_w_s_l_hpr, _t_w_s_l_hpr)
     s_hpr = append_data(s_hpr, _s_hpr)
@@ -462,6 +469,10 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _t_w_s_s_l_hpr = t_w_s_l_hpr[beg: end, :_t_w_eod_num]
         _t_w_l_s_lb_hpr = _t_w_s_s_l_hpr[sel_l_cond, :]
         _t_w_s_s_lb_hpr = _t_w_s_s_h_hpr[sel_s_cond, :]
+        # select hpr by stock during the week using open px
+        _t_w_ss_o_hpr = t_w_s_o_hpr[beg: end, :_t_w_eod_num]
+        _t_w_l_s_o_hpr = _t_w_ss_o_hpr[sel_l_cond, :]
+        _t_w_s_s_o_hpr = _t_w_ss_o_hpr[sel_s_cond, :]
 
         def calc_params(override_ext_lb_hpr,
                         _t_w_eods,
@@ -621,20 +632,31 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _t_w_s_s_lb_hpr_mean = np.mean(_t_w_s_s_lb_hpr, axis=0)
         _t_w_lb_hpr = (_t_w_l_s_lb_hpr_mean - _t_w_s_s_lb_hpr_mean) / 2
 
+        _t_w_l_s_o_hpr_mean = np.mean(_t_w_l_s_o_hpr, axis=0)
+        _t_w_s_s_o_hpr_mean = np.mean(_t_w_s_s_o_hpr, axis=0)
+        _t_w_o_hpr = (_t_w_l_s_o_hpr_mean - _t_w_s_s_o_hpr_mean) / 2
+
         sl_idxs = np.nonzero(_t_w_lb_hpr <= STOP_LOSS_HPR)
         _ext_idx = _t_w_eod_num - 1
         _stop = False
+        _stop_on_open = False
         if sl_idxs[0].shape[0] > 0:
             _ext_idx = sl_idxs[0][0]
             _stop = True
+            if _t_w_o_hpr[_ext_idx] <= STOP_LOSS_HPR:
+                _stop_on_open = True
 
         _s_l_ext_idx = np.full(_l_stocks.shape, _ext_idx)
         _s_s_ext_idx = np.full(_s_stocks.shape, _ext_idx)
         _s_l_stop = np.full(_l_stocks.shape, _stop)
         _s_s_stop = np.full(_s_stocks.shape, _stop)
         if _stop:
-            _s_l_ext_hpr = np.full(_l_stocks.shape, STOP_LOSS_HPR)
-            _s_s_ext_hpr = np.full(_s_stocks.shape, -STOP_LOSS_HPR)
+            if _stop_on_open:
+                _s_l_ext_hpr = _t_w_l_s_o_hpr[:,_ext_idx]
+                _s_s_ext_hpr = _t_w_s_s_o_hpr[:,_ext_idx]
+            else:
+                _s_l_ext_hpr = np.full(_l_stocks.shape, STOP_LOSS_HPR)
+                _s_s_ext_hpr = np.full(_s_stocks.shape, -STOP_LOSS_HPR)
         else:
             _s_l_ext_hpr = _t_w_l_s_hpr[:, _ext_idx]
             _s_s_ext_hpr = _t_w_s_s_hpr[:, _ext_idx]
@@ -672,17 +694,54 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
 
             return idxs
 
+        # _t_w_l_s_o_hpr = _t_w_s_s_o_hpr[sel_l_cond, :]
+        # _t_w_s_s_o_hpr = _t_w_s_s_o_hpr[sel_s_cond, :]
+        # long
         _s_l_stop_mask = _t_w_l_s_lb_hpr <= STOP_LOSS_HPR
         _s_l_stop = np.any(_s_l_stop_mask, axis=1)
         _s_l_ext_idx = first_true_idx_by_row(_s_l_stop_mask, _default_ext_idx)
+        # by default ext hpr == hpr no sl
         _s_l_ext_hpr = _t_w_l_s_hpr[:, _default_ext_idx]
-        _s_l_ext_hpr[_s_l_stop] = STOP_LOSS_HPR
+        # calc hpr for stocks with sl
+        # exit idx for stocks with sl
+        _s_l_sl_ext_idx = _s_l_ext_idx[_s_l_stop]
+        # stocks with sl hpr by open px during the week
+        _t_w_l_sl_s_o_hrp = _t_w_l_s_o_hpr[_s_l_stop, :]
+        _aaa = _t_w_l_sl_s_o_hrp
+        _xxx = np.arange(_aaa.shape[0])
+        _yyy = _s_l_sl_ext_idx
+        # hpr for stocks with sl by open px
+        _l_s_sl_o_hrp = _aaa[_xxx, _yyy]
+        # condition
+        _use_o_px = _l_s_sl_o_hrp <= STOP_LOSS_HPR
+        # stock with sl hpr
+        _s_l_sl_hpr = np.where(_use_o_px, _l_s_sl_o_hrp, STOP_LOSS_HPR)
+        # override default hpr for stocks with sl
+        _s_l_ext_hpr[_s_l_stop] = _s_l_sl_hpr
 
+        # short
         _s_s_stop_mask = _t_w_s_s_lb_hpr >= -STOP_LOSS_HPR
         _s_s_stop = np.any(_s_s_stop_mask, axis=1)
         _s_s_ext_idx = first_true_idx_by_row(_s_s_stop_mask, _default_ext_idx)
+
+        # by default ext hpr == hpr no sl
         _s_s_ext_hpr = _t_w_s_s_hpr[:, _default_ext_idx]
-        _s_s_ext_hpr[_s_s_stop] = -STOP_LOSS_HPR
+        # calc hpr for stocks with sl
+        # exit idx for stocks with sl
+        _s_s_sl_ext_idx = _s_s_ext_idx[_s_s_stop]
+        # stocks with sl hpr by open px during the week
+        _t_w_s_sl_s_o_hrp = _t_w_s_s_o_hpr[_s_s_stop, :]
+        _aaa = _t_w_s_sl_s_o_hrp
+        _xxx = np.arange(_aaa.shape[0])
+        _yyy = _s_s_sl_ext_idx
+        # hpr for stocks with sl by open px
+        _s_s_sl_o_hrp = _aaa[_xxx, _yyy]
+        # condition
+        _use_o_px = _s_s_sl_o_hrp >= -STOP_LOSS_HPR
+        # stock with sl hpr
+        _s_s_sl_hpr = np.where(_use_o_px, _s_s_sl_o_hrp, -STOP_LOSS_HPR)
+        # override default hpr for stocks with sl
+        _s_s_ext_hpr[_s_s_stop] = _s_s_sl_hpr
 
         _l_hpr, _s_hpr, _w_hpr, _min_w_eod_hpr, _min_w_lb_hpr, _l_stops, _s_stops, _s_longs, _s_shorts = calc_params(
             True,
@@ -761,14 +820,15 @@ if GRID_SEARCH:
             def print_row(model, sl_name):
                 model_hpr, model_min_w_eod_hpr, model_min_w_lb_hpr, model_l_stops, model_s_stops, model_l_port, model_s_port = model
 
-                wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(model_hpr[cv_wk_beg_idx:cv_wk_end_idx],
-                                                                                         w_enter_index[cv_wk_beg_idx:cv_wk_end_idx],
-                                                                                         raw_dt)
+                wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years = calc_wealth(
+                    model_hpr[cv_wk_beg_idx:cv_wk_end_idx],
+                    w_enter_index[cv_wk_beg_idx:cv_wk_end_idx],
+                    raw_dt)
 
                 yr_avg = np.mean(yr)
-                w_dd = np.min(model_hpr)
-                w_avg = np.mean(model_hpr)
-                w_best = np.max(model_hpr)
+                w_dd = np.min(model_hpr[cv_wk_beg_idx:cv_wk_end_idx])
+                w_avg = np.mean(model_hpr[cv_wk_beg_idx:cv_wk_end_idx])
+                w_best = np.max(model_hpr[cv_wk_beg_idx:cv_wk_end_idx])
 
                 min_min_w_eod = np.min(model_min_w_eod_hpr)
                 min_min_w_lb = np.min(model_min_w_lb_hpr)
@@ -776,20 +836,20 @@ if GRID_SEARCH:
                 writer.writerow(
                     (
                         sl_name,
-                        "%.2f" % STOP_LOSS_HPR,
+                        "%f" % STOP_LOSS_HPR,
                         SLCT_VAL,
                         'pct' if SLCT_TYPE == SelectionType.PCT else 'fixed',
                         wealth[-1],
-                        "%.2f" % min_min_w_eod,
-                        "%.2f" % min_min_w_lb,
-                        "%.2f" % dd,
-                        "%.2f" % w_dd,
-                        "%.2f" % w_avg,
-                        "%.2f" % w_best,
+                        "%f" % min_min_w_eod,
+                        "%f" % min_min_w_lb,
+                        "%f" % dd,
+                        "%f" % w_dd,
+                        "%f" % w_avg,
+                        "%f" % w_best,
                         sharpe,
-                        "%.2f" % yr_avg,
+                        "%f" % yr_avg,
                         rc_wealth[-1],
-                        "%.2f" % rc_dd
+                        "%f" % rc_dd
                     ))
 
             print_row(model_no_sl, 'no')
@@ -800,13 +860,19 @@ if GRID_SEARCH:
 
         # grid search
         SLCT_TYPE = SelectionType.FIXED
-        for SLCT_VAL in range(1, 16):
-            for STOP_LOSS_HPR in np.linspace(-0.01, -0.50, 49 * 2 + 1):
-                print_rows_for_fixed_params()
-        SLCT_TYPE = SelectionType.PCT
-        for SLCT_VAL in np.linspace(0.5, 15, 15 * 2):
-            for STOP_LOSS_HPR in np.linspace(-0.01, -0.50, 49 * 2 + 1):
-                print_rows_for_fixed_params()
+        for SLCT_VAL in range(1, 40):
+            print("FIXED %d" % SLCT_VAL)
+            # for STOP_LOSS_HPR in np.linspace(-0.01, -0.30, 29 * 2 + 1):
+            #     print("SL %.2f" % STOP_LOSS_HPR)
+            #     print_rows_for_fixed_params()
+            # no sl grid search
+            STOP_LOSS_HPR = 0.0
+            print("SL %.2f" % STOP_LOSS_HPR)
+            print_rows_for_fixed_params()
+        # SLCT_TYPE = SelectionType.PCT
+        # for SLCT_VAL in np.linspace(0.5, 15, 15 * 2):
+        #     for STOP_LOSS_HPR in np.linspace(-0.01, -0.50, 49 * 2 + 1):
+        #         print_rows_for_fixed_params()
 
 else:
     # plot hpr vs prob
@@ -848,9 +914,9 @@ else:
                                                                              raw_dt)
 
     yr_avg = np.mean(yr)
-    w_dd = np.min(model_hpr)
-    w_avg = np.mean(model_hpr)
-    w_best = np.max(model_hpr)
+    w_dd = np.min(model_hpr[cv_wk_beg_idx:cv_wk_end_idx])
+    w_avg = np.mean(model_hpr[cv_wk_beg_idx:cv_wk_end_idx])
+    w_best = np.max(model_hpr[cv_wk_beg_idx:cv_wk_end_idx])
 
     print(
         "F: {:.2f} DD: {:.2f} W_DD: {:.2f} W_AVG: {:.2f} W_BEST: {:.2f} SHARPE: {:.2f} AVG_YEAR: {:.2f} F_R: {:.2f} DD_R: {:.2f}".format(

@@ -1,12 +1,14 @@
 import tensorflow as tf
 from utilsnn import xavier_init
 
+USE_DROP_OUT = False
 
 class FFNN(object):
     def __init__(self, RANDOM_INIT, ALL_WEIGHTS_TRAINABLE, input_size, layer_sizes, layer_names,
                  optimizer=tf.train.AdamOptimizer(),
                  transfer_function=tf.nn.sigmoid):
 
+        self.keep_prob = tf.placeholder(tf.float32)
         self.RANDOM_INIT = RANDOM_INIT
         self.ALL_WEIGHTS_TRAINABLE = ALL_WEIGHTS_TRAINABLE
         self.layer_names = layer_names
@@ -36,6 +38,7 @@ class FFNN(object):
             self.encoding_biases.append(b)
 
             output = transfer_function(tf.matmul(next_layer_input, W) + b)
+            output = tf.nn.dropout(output, self.keep_prob)
 
             # the input into the next layer is the output of this layer
             next_layer_input = output
@@ -53,6 +56,7 @@ class FFNN(object):
         self.ff_matrices.append(W)
         self.ff_biases.append(b)
         output = transfer_function(tf.matmul(next_layer_input, W) + b)
+        output = tf.nn.dropout(output, self.keep_prob)
         next_layer_input = output
 
         # W = tf.get_variable(name="ffw2", shape=(50, 2), dtype=tf.float32,
@@ -105,8 +109,8 @@ class FFNN(object):
         return dict_w
 
     def partial_fit(self, X, Y):
-        cost, opt = self.sess.run((self.cost, self.optimizer), feed_dict={self.x: X, self.y: Y})
+        cost, opt = self.sess.run((self.cost, self.optimizer), feed_dict={self.x: X, self.y: Y, self.keep_prob: 0.5 if USE_DROP_OUT else 1.0})
         return cost
 
     def predict(self, X):
-        return self.sess.run((self.output), feed_dict={self.x: X})
+        return self.sess.run((self.output), feed_dict={self.x: X, self.keep_prob: 1.0})
