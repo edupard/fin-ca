@@ -1,7 +1,6 @@
 import tensorflow as tf
 from utilsnn import xavier_init
-
-USE_DROP_OUT = False
+from config import get_config
 
 class FFNN(object):
     def __init__(self, RANDOM_INIT, ALL_WEIGHTS_TRAINABLE, input_size, layer_sizes, layer_names,
@@ -109,7 +108,7 @@ class FFNN(object):
         return dict_w
 
     def partial_fit(self, X, Y):
-        cost, opt = self.sess.run((self.cost, self.optimizer), feed_dict={self.x: X, self.y: Y, self.keep_prob: 0.5 if USE_DROP_OUT else 1.0})
+        cost, opt = self.sess.run((self.cost, self.optimizer), feed_dict={self.x: X, self.y: Y, self.keep_prob: 0.5 if get_config().USE_DROP_OUT else 1.0})
         return cost
 
     def predict(self, X):

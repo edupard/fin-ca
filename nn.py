@@ -3,21 +3,22 @@ from au import AutoEncoder
 from ffnn import FFNN
 import tensorflow as tf
 import numpy as np
+import progress
 
 TRAIN_RBM = False
-RBM_EPOCH_TO_TRAIN = 30
+RBM_EPOCH_TO_TRAIN = 20
 RBM_BATCH_SIZE = 10
 
 TRAIN_AU = False
-LOAD_RBM_WEIGHTS = False
-AU_EPOCH_TO_TRAIN = 100
+LOAD_RBM_WEIGHTS = True
+AU_EPOCH_TO_TRAIN = 20
 AU_BATCH_SIZE = 10
 
 TRAIN_FFNN = False
 LOAD_AU_WEIGHTS = False
-FFNN_EPOCH_TO_TRAIN = 6001
+FFNN_EPOCH_TO_TRAIN = 50001
 ALIGN_BATCH_TO_DATA = True
-FFNN_BATCH_SIZE = 10
+FFNN_BATCH_SIZE = 1000
 RANDOM_INIT = True
 ALL_WEIGHTS_TRAINABLE = True
 
@@ -73,10 +74,8 @@ def train_rbm(dr, wr, tr_beg_idx, tr_end_idx):
 
             cost = rbmobject1.partial_fit(input)
             epoch_cost += cost
-            progress = b // (batches_per_epoch // 10)
-            if progress != curr_progress:
-                print('.', sep=' ', end='', flush=True)
-                curr_progress = progress
+            curr_progress = progress.print_progress(curr_progress, b, batches_per_epoch)
+        progress.print_progess_end()
         print(" Epoch cost: {:.3f}".format(epoch_cost / batches_per_epoch))
 
     rbmobject1.save_weights('./rbm/rbmw1.chp')
@@ -98,10 +97,8 @@ def train_rbm(dr, wr, tr_beg_idx, tr_end_idx):
             input = rbmobject1.transform(input)
             cost = rbmobject2.partial_fit(input)
             epoch_cost += cost
-            progress = b // (batches_per_epoch // 10)
-            if progress != curr_progress:
-                print('.', sep=' ', end='', flush=True)
-                curr_progress = progress
+            curr_progress = progress.print_progress(curr_progress, b, batches_per_epoch)
+        progress.print_progess_end()
         print(" Epoch cost: {:.3f}".format(epoch_cost / batches_per_epoch))
 
     rbmobject2.save_weights('./rbm/rbmw2.chp')
@@ -142,10 +139,8 @@ def train_ae(dr, wr, tr_beg_idx, tr_end_idx):
             cost = autoencoder.partial_fit(input)
             # print("Batch cost: {:.3f}".format(cost))
             epoch_cost += cost
-            progress = b // (batches_per_epoch // 10)
-            if progress != curr_progress:
-                print('.', sep=' ', end='', flush=True)
-                curr_progress = progress
+            curr_progress = progress.print_progress(curr_progress, b, batches_per_epoch)
+        progress.print_progess_end()
         print(" Epoch cost: {:.3f}".format(epoch_cost / batches_per_epoch))
 
     autoencoder.save_weights('./rbm/au.chp')
@@ -184,10 +179,8 @@ def train_ffnn(dr, wr, c_l, c_s, w_data_index, w_num_stocks, tr_beg_idx, tr_end_
                 cost = ffnn.partial_fit(input, observation)
                 # print("Batch cost: {:.3f}".format(cost))
                 epoch_cost += cost
-                progress = b // (batches_per_epoch // 10)
-                if progress != curr_progress:
-                    print('.', sep=' ', end='', flush=True)
-                    curr_progress = progress
+                curr_progress = progress.print_progress(curr_progress, b, batches_per_epoch)
+            progress.print_progess_end()
             print(" Epoch {} cost: {:.6f}".format(i, epoch_cost / batches_per_epoch))
             if i % SAVE_EACH_N_EPOCHS == 0:
                 print("Model saved")
@@ -220,10 +213,8 @@ def train_ffnn(dr, wr, c_l, c_s, w_data_index, w_num_stocks, tr_beg_idx, tr_end_
                 cost = ffnn.partial_fit(input, observation)
                 # print("Batch cost: {:.3f}".format(cost))
                 epoch_cost += cost
-                progress = b // (batches_per_epoch // 10)
-                if progress != curr_progress:
-                    print('.', sep=' ', end='', flush=True)
-                    curr_progress = progress
+                curr_progress = progress.print_progress(curr_progress, b, batches_per_epoch)
+            progress.print_progess_end()
             print(" Epoch {} cost: {:.6f}".format(i, epoch_cost / batches_per_epoch))
             if i % SAVE_EACH_N_EPOCHS == 0:
                 print("Model saved")
@@ -254,8 +245,6 @@ def evaluate_ffnn(data_set_records, dr, wr, prob_l):
             prob_l[idx] = p_dist[idx - start_idx, 0]
         if end_idx >= data_set_records:
             break
-        progress = b // (batches_per_epoch // 10)
-        if progress != curr_progress:
-            print('.', sep=' ', end='', flush=True)
-            curr_progress = progress
+        curr_progress = progress.print_progress(curr_progress, b, batches_per_epoch)
         b += 1
+    progress.print_progess_end()

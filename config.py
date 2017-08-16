@@ -2,6 +2,7 @@ import datetime
 
 from enum import Enum
 
+_5_USD = 5.0
 _ZERO = 0
 _10M = 10000000
 YR_90 = datetime.datetime.strptime('1900-01-01', '%Y-%m-%d').date()
@@ -44,30 +45,35 @@ class Config(object):
     SLCT_PCT = 100
     SLCT_ALG = SelectionAlgo.TOP
 
-    MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 10
+    MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 30
 
     # train period
     TRAIN_BEG = YR_00
     TRAIN_END = YR_10
 
     # filters
-
     MIN_SELECTION_STOCKS = None
-    AVG_DAY_TO_LIMIT = None
+    AVG_DAY_TO_LIMIT = _10M
     TOP_TRADABLE_STOCKS = None
-    DAY_TO_LIMIT = _ZERO
+    FILTER_BY_DAY_TO = False
+    DAY_TO_LIMIT = _10M
+    CLOSE_PX_FILTER = _5_USD
 
     # cv params
     CV_BEG = YR_10
     CV_END = HIST_END
 
-    SLCT_TYPE = SelectionType.FIXED
-    SLCT_VAL = 30
+    SLCT_TYPE = SelectionType.PCT
+    SLCT_VAL = 1
 
     STOP_LOSS_HPR = -0.12
     STOP_LOSS_TYPE = StopLossType.NO
 
-    GRID_SEARCH = False
+    GRID_SEARCH = True
+
+    USE_DROP_OUT = True
+
+    PRINT_PORTFOLIO = False
 
 _config = Config()
 

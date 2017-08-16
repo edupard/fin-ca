@@ -6,9 +6,26 @@ import math
 import datetime
 import csv
 
+from config import get_config
+
 DDMMMYY_FMT = matplotlib.dates.DateFormatter('%y %b %d')
 YYYY_FMT = matplotlib.dates.DateFormatter('%Y')
 
+def plot_stock_returns(r, mpl_dt):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.grid(True, linestyle='-', color='0.75')
+    ax.xaxis.set_major_formatter(DDMMMYY_FMT)
+    for label in ax.xaxis.get_ticklabels():
+        label.set_rotation(45)
+    pos_mask = r >= 0
+    pos_r = r[pos_mask]
+    pos_mpl_dt = mpl_dt[pos_mask]
+    ax.plot_date(pos_mpl_dt, pos_r, color='g', fmt='o')
+    neg_mask = ~pos_mask
+    neg_r = r[neg_mask]
+    neg_mpl_dt = mpl_dt[neg_mask]
+    ax.plot_date(neg_mpl_dt, neg_r, color='r', fmt='o')
 
 def plot_20_random_stock_prices(raw_data, raw_mpl_dt):
     fig = plt.figure()
@@ -42,17 +59,6 @@ def plot_traded_stocks_per_day(traded_stocks, raw_mpl_dt):
     for label in ax.xaxis.get_ticklabels():
         label.set_rotation(45)
     ax.plot_date(raw_mpl_dt, traded_stocks, color='b', fmt='o')
-
-
-# for i in range(20):
-#     idx = random.randrange(0, raw_data.shape[0])
-#     traded_stocks = mask[idx,:].astype(int) * (i + 1)
-#     ax.plot_date(raw_mpl_dt, traded_stocks, fmt='o')
-
-# for i in range(20):
-#     idx = random.randrange(0, raw_data.shape[0])
-#     g = g_a[idx, :]
-#     ax.plot_date(raw_mpl_dt, g, fmt='o')
 
 
 # def hpr_analysis(t_hpr, b_hpr):
@@ -102,7 +108,20 @@ def confusion_matrix(a_l, a_s, p_l, p_s):
     ))
 
 
-def wealth_graph(wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years, w_exit_index, raw_mpl_dt):
+def wealth_graph(yr_avg,
+                 w_dd,
+                 w_avg,
+                 w_best,
+                 wealth,
+                 dd,
+                 sharpe,
+                 rc_wealth,
+                 rc_dd,
+                 rc_sharpe,
+                 yr,
+                 years,
+                 w_exit_index,
+                 raw_mpl_dt):
     def format_time_labels(ax, fmt):
         ax.xaxis.set_major_formatter(fmt)
         for label in ax.xaxis.get_ticklabels():
@@ -114,27 +133,28 @@ def wealth_graph(wealth, dd, sharpe, rc_wealth, rc_dd, rc_sharpe, yr, years, w_e
     def hide_time_labels(ax):
         plt.setp(ax.get_xticklabels(), visible=False)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(1, 1, 1)
-    draw_grid(ax)
-    format_time_labels(ax, fmt=DDMMMYY_FMT)
-    ax.set_title("1 USD PL Sharpe: %.2f Draw down: %.2f" % (sharpe, dd * 100))
-    ax.plot_date(raw_mpl_dt[w_exit_index], wealth, color='b', fmt='-')
-
-    fig = plt.figure()
-    ax = fig.add_subplot(1, 1, 1, sharex=ax)
-    draw_grid(ax)
-    # hide_time_labels(ax)
-    ax.set_title("1 USD PL RECAP Draw down: %.2f" % (rc_dd * 100))
-    ax.plot_date(raw_mpl_dt[w_exit_index], rc_wealth, color='b', fmt='-')
-    format_time_labels(ax, fmt=DDMMMYY_FMT)
-
     yr = np.array(yr)
     yts = []
     for y in years:
         dt = datetime.date(year=y, day=1, month=1)
         yts.append(matplotlib.dates.date2num(dt))
     yts = np.array(yts)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    draw_grid(ax)
+    format_time_labels(ax, fmt=DDMMMYY_FMT)
+    ax.set_title(
+        "1 usd pl sharpe: %.2f dd: %.2f%% avg y: %.2f%% avg w: %.2f%%" % (sharpe, dd * 100, yr_avg * 100, w_avg * 100))
+    ax.plot_date(raw_mpl_dt[w_exit_index], wealth, color='b', fmt='-')
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(1, 1, 1, sharex=ax)
+    # draw_grid(ax)
+    # # hide_time_labels(ax)
+    # ax.set_title("1 USD PL RECAP Draw down: %.2f" % (rc_dd * 100))
+    # ax.plot_date(raw_mpl_dt[w_exit_index], rc_wealth, color='b', fmt='-')
+    # format_time_labels(ax, fmt=DDMMMYY_FMT)
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
@@ -216,7 +236,13 @@ def wealth_csv(sl_name,
                w_enter_index,
                w_exit_index,
                raw_dt,
-               model):
+               model,
+               model_min_to,
+               model_avg_to,
+               model_longs,
+               model_shorts,
+               model_selection
+               ):
     model_hpr, model_min_w_eod_hpr, model_min_w_lb_hpr, model_l_stops, model_s_stops, model_l_port, model_s_port = model
     model_hpr = model_hpr[wk_beg_idx:wk_end_idx]
     model_min_w_eod_hpr = model_min_w_eod_hpr[wk_beg_idx:wk_end_idx]
@@ -225,6 +251,12 @@ def wealth_csv(sl_name,
     model_s_stops = model_s_stops[wk_beg_idx:wk_end_idx]
     model_l_port = model_l_port[wk_beg_idx:wk_end_idx]
     model_s_port = model_s_port[wk_beg_idx:wk_end_idx]
+    model_min_to = model_min_to[wk_beg_idx:wk_end_idx]
+    model_avg_to = model_avg_to[wk_beg_idx:wk_end_idx]
+    model_longs = model_longs[wk_beg_idx:wk_end_idx]
+    model_shorts = model_shorts[wk_beg_idx:wk_end_idx]
+    model_selection = model_selection[wk_beg_idx:wk_end_idx]
+
     w_enter_index = w_enter_index[wk_beg_idx:wk_end_idx]
     w_exit_index = w_exit_index[wk_beg_idx:wk_end_idx]
 
@@ -237,14 +269,17 @@ def wealth_csv(sl_name,
             (
                 'beg',
                 'end',
-                '%s sl wealth' % sl_name,
-                '%s sl hpr' % sl_name,
-                '%s sl min w' % sl_name,
-                '%s sl min w lb' % sl_name,
-                '%s sl l stops' % sl_name,
-                '%s sl s stops' % sl_name,
-                '%s sl l port' % sl_name,
-                '%s sl s port' % sl_name)
+                'wealth',
+                'hpr',
+                'min w',
+                'min w lb',
+                'l stops',
+                's stops',
+                'min w to',
+                'avg w to',
+                'stks',
+                'l',
+                's',)
         )
         for w in range(wealth.shape[0]):
             dt_enter = datetime.datetime.fromtimestamp(raw_dt[w_enter_index[w]])
@@ -258,7 +293,81 @@ def wealth_csv(sl_name,
                  "%.2f%%" % (model_min_w_lb_hpr[w] * 100.0),
                  model_l_stops[w],
                  model_s_stops[w],
-                 model_l_port[w],
-                 model_s_port[w]
+                 model_min_to[w],
+                 model_avg_to[w],
+                 model_selection[w],
+                 model_longs[w],
+                 model_shorts[w]
                  )
             )
+    if not get_config().PRINT_PORTFOLIO:
+        return
+    with open('./data/weekly_{}_sl_portfolio.csv'.format(sl_name), 'w', newline='') as f_p:
+        p_writer = csv.writer(f_p)
+
+        p_writer.writerow(
+            (
+                'beg',
+                'end',
+                'pos',
+                'ticker',
+                'l p',
+                'ret',
+                'ext',
+                'wato')
+        )
+
+        for w in range(wealth.shape[0]):
+            dt_enter = datetime.datetime.fromtimestamp(raw_dt[w_enter_index[w]])
+            dt_exit = datetime.datetime.fromtimestamp(raw_dt[w_exit_index[w]])
+            _l_port_df = model_l_port[w]
+            _s_port_df = model_s_port[w]
+            # for index, row in _l_port_df.iterrows():
+            #     p_writer.writerow(
+            #         (
+            #             dt_enter.strftime('%Y-%m-%d'),
+            #             dt_exit.strftime('%Y-%m-%d'),
+            #             'long',
+            #             row.ticker,
+            #             row.p,
+            #             row.ret,
+            #             row.ext,
+            #             row.wato)
+            #     )
+            # for index, row in _s_port_df.iterrows():
+            #     p_writer.writerow(
+            #         (
+            #             dt_enter.strftime('%Y-%m-%d'),
+            #             dt_exit.strftime('%Y-%m-%d'),
+            #             'short',
+            #             row.ticker,
+            #             row.p,
+            #             row.ret,
+            #             row.ext,
+            #             row.wato)
+            #     )
+
+            for idx in range(_l_port_df.shape[0]):
+                p_writer.writerow(
+                    (
+                        dt_enter.strftime('%Y-%m-%d'),
+                        dt_exit.strftime('%Y-%m-%d'),
+                        'long',
+                        _l_port_df[idx, 0],
+                        _l_port_df[idx, 4],
+                        _l_port_df[idx, 1],
+                        _l_port_df[idx, 2],
+                        _l_port_df[idx, 3])
+                )
+            for idx in range(_s_port_df.shape[0]):
+                p_writer.writerow(
+                    (
+                        dt_enter.strftime('%Y-%m-%d'),
+                        dt_exit.strftime('%Y-%m-%d'),
+                        'short',
+                        _s_port_df[idx, 0],
+                        _s_port_df[idx, 4],
+                        _s_port_df[idx, 1],
+                        _s_port_df[idx, 2],
+                        _s_port_df[idx, 3])
+                )

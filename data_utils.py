@@ -148,6 +148,20 @@ def get_top_tradable_stks(raw_data, trading_day_mask, s_i, e_i, limit):
     t_s_i = s_t_s_i[-limit:]
     return t_s_i
 
+def get_stks_with_price_above(raw_data, e_i, limit):
+    active_stk_mask = (raw_data[:, e_i, DATA_TO_IDX] / raw_data[:, e_i, DATA_VOLUME_IDX]) > limit
+    # active_stk_mask = raw_data[:, e_i, DATA_CLOSE_IDX] > limit
+    t_s_i = np.where(active_stk_mask)[0]
+    return t_s_i
+
+def get_avg_stk_to(raw_data, tsi, trading_day_mask, s_i, e_i):
+    dts = get_intermediate_dates(trading_day_mask, s_i, e_i)
+    raw_data = raw_data[:, dts, :]
+    raw_data = raw_data[tsi,:,:]
+    s_to = raw_data[:, :, DATA_TO_IDX]
+    avg_s_to = np.mean(s_to, axis=1)
+    return avg_s_to
+
 def get_active_stks(raw_data, trading_day_mask, s_i, e_i, limit):
     dts = get_intermediate_dates(trading_day_mask, s_i, e_i)
     raw_data = raw_data[:, dts, :]
