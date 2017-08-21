@@ -18,13 +18,11 @@ from config import get_config, SelectionType, SelectionAlgo, StopLossType
 import progress
 
 print('loading data...')
+# tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq.npz')
 tickers, raw_dt, raw_data = load_npz_data_alt('data/nyse_nasdaq.npz')
 print('data load complete')
 
 raw_mpl_dt = convert_to_mpl_time(raw_dt)
-
-actively_tradeable_mask = filter_activelly_tradeable_stocks(raw_data, get_config().DAY_TO_LIMIT)
-actively_tradable_stocks_per_day = actively_tradeable_mask[:, :].sum(0)
 
 
 def get_ticker_idx(ticker, tickers):
@@ -160,6 +158,7 @@ def update_indexes():
         if cv_wk_end_idx is None:
             cv_wk_end_idx = total_weeks
 
+
 TOTAL_DAYS = (get_config().HIST_END - get_config().HIST_BEG).days
 curr_progress = 0
 
@@ -168,6 +167,10 @@ print('preprocessing data...')
 while True:
     # iterate over weeks
     SUNDAY = SUNDAY + datetime.timedelta(days=7)
+    # DEBUG_DATE = datetime.datetime.strptime('2001-09-16', '%Y-%m-%d').date()
+    # if (SUNDAY == DEBUG_DATE):
+    #     debug = 0
+
     PASSED_DAYS = (SUNDAY - get_config().HIST_BEG).days
     curr_progress = progress.print_progress(curr_progress, PASSED_DAYS, TOTAL_DAYS)
     # break when all availiable data processed
@@ -200,10 +203,20 @@ while True:
     else:
         ext_r_i = w_r_i[-1:]
 
-    tw_r_i = get_intermediate_dates(trading_day_mask, ent_r_i[0], ext_r_i[0])
+    if get_config().ENT_ON_MON:
+        tw_r_i = get_intermediate_dates(trading_day_mask, d_r_i[-1], ext_r_i[0])
+    else:
+        tw_r_i = get_intermediate_dates(trading_day_mask, ent_r_i[0], ext_r_i[0])
+    if len(tw_r_i) == 0:
+        continue
+
+    # train fiter
     # stocks should be tradeable on all dates we need for calcs
     t_s_i = get_tradable_stock_indexes(tradable_mask, w_r_i + d_r_i + ent_r_i + ext_r_i + tw_r_i)
 
+    if get_config().SNP_FILTER is not None and get_config().SNP_FILTER:
+        snp_s_i = get_tradable_stock_indexes(snp_mask, w_r_i + d_r_i + ent_r_i + ext_r_i + tw_r_i)
+        t_s_i = np.intersect1d(t_s_i, snp_s_i)
     if get_config().CLOSE_PX_FILTER is not None:
         f_s_i = get_stks_with_price_above(raw_data, d_r_i[-1], get_config().CLOSE_PX_FILTER)
         t_s_i = np.intersect1d(t_s_i, f_s_i)
@@ -215,17 +228,48 @@ while True:
         t_t_s_i = get_top_tradable_stks(raw_data, trading_day_mask, w_r_i[0], d_r_i[-1],
                                         get_config().TOP_TRADABLE_STOCKS)
         t_s_i = np.intersect1d(t_s_i, t_t_s_i)
-    if get_config().FILTER_BY_DAY_TO:
+    if get_config().DAY_TO_LIMIT is not None:
+        try:
+            actively_tradeable_mask
+        except NameError:
+            actively_tradeable_mask = filter_activelly_tradeable_stocks(raw_data, get_config().DAY_TO_LIMIT)
         a_t_s_i = get_tradable_stock_indexes(actively_tradeable_mask, w_r_i[:-1] + d_r_i)
         t_s_i = np.intersect1d(t_s_i, a_t_s_i)
 
-    # t_s_i_e_e = get_tradable_stock_indexes(tradable_mask, w_r_i[-1:] + ent_r_i + ext_r_i + tw_r_i)
-    # t_s_i_old = np.intersect1d(t_s_i_old, t_s_i_e_e)
-    #
-    # print("new: %d vs old: %d" % (t_s_i.shape[0], t_s_i_old.shape[0]))
-
     if get_config().MIN_SELECTION_STOCKS is not None:
         if t_s_i.shape[0] < get_config().MIN_SELECTION_STOCKS:
+            continue
+
+    # cv filter
+    # stocks should be tradeable on all dates we need for calcs
+    t_s_i_cv = get_tradable_stock_indexes(tradable_mask, w_r_i + d_r_i + ent_r_i + ext_r_i + tw_r_i)
+
+    if get_config().SNP_FILTER_CV is not None and get_config().SNP_FILTER_CV:
+        snp_s_i = get_tradable_stock_indexes(snp_mask, w_r_i + d_r_i + ent_r_i + ext_r_i + tw_r_i)
+        t_s_i_cv = np.intersect1d(t_s_i_cv, snp_s_i)
+    if get_config().CLOSE_PX_FILTER_CV is not None:
+        f_s_i = get_stks_with_price_above(raw_data, d_r_i[-1], get_config().CLOSE_PX_FILTER_CV)
+        t_s_i_cv = np.intersect1d(t_s_i_cv, f_s_i)
+    if get_config().AVG_DAY_TO_LIMIT_CV is not None:
+        a_s_i = get_active_stks(raw_data, trading_day_mask, d_r_i[0], d_r_i[-1],
+                                get_config().AVG_DAY_TO_LIMIT_CV)
+        # a_s_i = get_active_stks(raw_data, trading_day_mask, w_r_i[0], d_r_i[-1], get_config().AVG_DAY_TO_LIMIT_CV)
+        t_s_i_cv = np.intersect1d(t_s_i_cv, a_s_i)
+    if get_config().TOP_TRADABLE_STOCKS_CV is not None:
+        t_t_s_i = get_top_tradable_stks(raw_data, trading_day_mask, w_r_i[0], d_r_i[-1],
+                                        get_config().TOP_TRADABLE_STOCKS_CV)
+        t_s_i_cv = np.intersect1d(t_s_i_cv, t_t_s_i)
+    if get_config().DAY_TO_LIMIT_CV is not None:
+        try:
+            actively_tradeable_mask_cv
+        except NameError:
+            actively_tradeable_mask_cv = filter_activelly_tradeable_stocks(raw_data,
+                                                                           get_config().DAY_TO_LIMIT_CV)
+        a_t_s_i = get_tradable_stock_indexes(actively_tradeable_mask_cv, w_r_i[:-1] + d_r_i)
+        t_s_i_cv = np.intersect1d(t_s_i_cv, a_t_s_i)
+
+    if get_config().MIN_SELECTION_STOCKS_CV is not None:
+        if t_s_i_cv.shape[0] < get_config().MIN_SELECTION_STOCKS_CV:
             continue
 
     # calc network input
@@ -233,6 +277,14 @@ while True:
     w_c = get_prices(raw_data, t_s_i, w_r_i, PxType.CLOSE)
     d_n_r = calc_z_score(d_c)
     w_n_r = calc_z_score(w_c[:, :-1])
+
+    # slice data according to cv filter
+    filter = np.isin(t_s_i, t_s_i_cv)
+    t_s_i = t_s_i[filter]
+    d_c = d_c[filter, :]
+    w_c = w_c[filter, :]
+    d_n_r = d_n_r[filter, :]
+    w_n_r = w_n_r[filter, :]
 
     _avg_s_to = get_avg_stk_to(raw_data, t_s_i, trading_day_mask, d_r_i[0], d_r_i[-1])
 
@@ -277,6 +329,8 @@ while True:
     wr = append_data(wr, w_n_r)
     # intermediate week points num
     _t_w_eod_num = _t_w_s_hpr.shape[1]
+    if _t_w_eod_num == 0:
+        debug = 0
     t_w_eod_num = append_data(t_w_eod_num, np.array([_t_w_eod_num]))
     _t_w_eods = np.array(tw_r_i).reshape((1, -1))
     t_w_eods = append_data_and_pad_with_zeros(t_w_eods, _t_w_eods)
@@ -375,51 +429,75 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _s_c_l |= pred_long_cond
         _s_c_s |= ~pred_long_cond
 
-        if get_config().SLCT_TYPE == SelectionType.PCT:
-            top_bound = np.percentile(_prob_l, 100 - get_config().SLCT_VAL)
-            bottom_bound = np.percentile(_prob_l, get_config().SLCT_VAL)
-        else:
-            _prob_l_sorted = np.sort(_prob_l)
-            bottom_bound = _prob_l_sorted[get_config().SLCT_VAL - 1]
-            top_bound = _prob_l_sorted[-get_config().SLCT_VAL]
-
         _s_s_l = s_l[beg: end]
         _s_s_s = s_s[beg: end]
-        long_cond = _prob_l >= top_bound
-        short_cond = _prob_l <= bottom_bound
-        _s_s_l |= long_cond
-        _s_s_s |= short_cond
+
         _int_r = s_int_r[beg:end]
-        l_s_int_r = _int_r[_s_s_l]
-        s_s_int_r = _int_r[_s_s_s]
 
-        if get_config().SLCT_ALG == SelectionAlgo.TOP:
-            l_int_r_t_b = np.max(l_s_int_r)
-            l_int_r_b_b = np.percentile(l_s_int_r, 100 - get_config().SLCT_PCT)
-        elif get_config().SLCT_ALG == SelectionAlgo.BOTTOM:
-            l_int_r_t_b = np.percentile(l_s_int_r, get_config().SLCT_PCT)
-            l_int_r_b_b = np.min(l_s_int_r)
-        elif get_config().SLCT_ALG == SelectionAlgo.MIDDLE:
-            l_int_r_t_b = np.percentile(l_s_int_r, 100 - get_config().SLCT_PCT / 2)
-            l_int_r_b_b = np.percentile(l_s_int_r, get_config().SLCT_PCT / 2)
+        _metric = np.sign(_prob_l - prob_median) * _int_r
+        _metric_l = _metric[pred_long_cond]
+        _metric_s = _metric[~pred_long_cond]
+        _metric_sorted_l =  np.sort(_metric_l)
+        _metric_sorted_s = np.sort(_metric_s)
 
-        if get_config().SLCT_ALG == SelectionAlgo.TOP:
-            s_int_r_t_b = np.percentile(s_s_int_r, get_config().SLCT_PCT)
-            s_int_r_b_b = np.min(s_s_int_r)
-        elif get_config().SLCT_ALG == SelectionAlgo.BOTTOM:
-            s_int_r_t_b = np.max(s_s_int_r)
-            s_int_r_b_b = np.percentile(s_s_int_r, 100 - get_config().SLCT_PCT)
-        elif get_config().SLCT_ALG == SelectionAlgo.MIDDLE:
-            s_int_r_t_b = np.percentile(s_s_int_r, 100 - get_config().SLCT_PCT / 2)
-            s_int_r_b_b = np.percentile(s_s_int_r, get_config().SLCT_PCT / 2)
+        _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_l.shape[0])
+        _l_b = _metric_sorted_l[_sel_stks - 1]
+        _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_s.shape[0])
+        _s_b = _metric_sorted_s[_sel_stks - 1]
 
         sel_l_cond = _s_s_l
-        sel_l_cond &= _int_r >= l_int_r_b_b
-        sel_l_cond &= _int_r <= l_int_r_t_b
+        sel_l_cond |= pred_long_cond
+        sel_l_cond &= (_metric <= _l_b)
 
         sel_s_cond = _s_s_s
-        sel_s_cond &= _int_r <= s_int_r_t_b
-        sel_s_cond &= _int_r >= s_int_r_b_b
+        sel_s_cond |= ~pred_long_cond
+        sel_s_cond &= (_metric <= _s_b)
+
+        # if get_config().SLCT_TYPE == SelectionType.PCT:
+        #     top_bound = np.percentile(_prob_l, 100 - get_config().SLCT_VAL)
+        #     bottom_bound = np.percentile(_prob_l, get_config().SLCT_VAL)
+        # else:
+        #     _prob_l_sorted = np.sort(_prob_l)
+        #     _sel_stks = min(get_config().SLCT_VAL, _prob_l_sorted.shape[0])
+        #     bottom_bound = _prob_l_sorted[_sel_stks - 1]
+        #     top_bound = _prob_l_sorted[-_sel_stks]
+        #
+        #
+        # long_cond = _prob_l >= top_bound
+        # short_cond = _prob_l <= bottom_bound
+        # _s_s_l |= long_cond
+        # _s_s_s |= short_cond
+        #
+        # l_s_int_r = _int_r[_s_s_l]
+        # s_s_int_r = _int_r[_s_s_s]
+        #
+        # if get_config().SLCT_ALG == SelectionAlgo.CONFIRMED:
+        #     l_int_r_t_b = np.max(l_s_int_r)
+        #     l_int_r_b_b = np.percentile(l_s_int_r, 100 - get_config().SLCT_PCT)
+        # elif get_config().SLCT_ALG == SelectionAlgo.NON_CONFIRMED:
+        #     l_int_r_t_b = np.percentile(l_s_int_r, get_config().SLCT_PCT)
+        #     l_int_r_b_b = np.min(l_s_int_r)
+        # elif get_config().SLCT_ALG == SelectionAlgo.MIDDLE:
+        #     l_int_r_t_b = np.percentile(l_s_int_r, 100 - get_config().SLCT_PCT / 2)
+        #     l_int_r_b_b = np.percentile(l_s_int_r, get_config().SLCT_PCT / 2)
+        #
+        # if get_config().SLCT_ALG == SelectionAlgo.CONFIRMED:
+        #     s_int_r_t_b = np.percentile(s_s_int_r, get_config().SLCT_PCT)
+        #     s_int_r_b_b = np.min(s_s_int_r)
+        # elif get_config().SLCT_ALG == SelectionAlgo.NON_CONFIRMED:
+        #     s_int_r_t_b = np.max(s_s_int_r)
+        #     s_int_r_b_b = np.percentile(s_s_int_r, 100 - get_config().SLCT_PCT)
+        # elif get_config().SLCT_ALG == SelectionAlgo.MIDDLE:
+        #     s_int_r_t_b = np.percentile(s_s_int_r, 100 - get_config().SLCT_PCT / 2)
+        #     s_int_r_b_b = np.percentile(s_s_int_r, get_config().SLCT_PCT / 2)
+        #
+        # sel_l_cond = _s_s_l
+        # sel_l_cond &= _int_r >= l_int_r_b_b
+        # sel_l_cond &= _int_r <= l_int_r_t_b
+        #
+        # sel_s_cond = _s_s_s
+        # sel_s_cond &= _int_r <= s_int_r_t_b
+        # sel_s_cond &= _int_r >= s_int_r_b_b
 
         # select long and short stocks in portfolio
         _stocks = stocks[beg:end]
@@ -491,18 +569,42 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
 
             _l_hpr = np.mean(_l_s_hpr)
             _s_hpr = np.mean(_s_s_hpr)
-            _w_hpr = (_l_hpr - _s_hpr) / 2
+
+            _w_hpr = np.zeros(_l_hpr.shape)
+            if get_config().LONG_LEG:
+                _w_hpr += _l_hpr
+            if get_config().SHORT_LEG:
+                _w_hpr -= _s_hpr
+            if get_config().LONG_LEG and get_config().SHORT_LEG:
+                _w_hpr /= 2
+            # _w_hpr = (_l_hpr - _s_hpr) / 2
 
             # calc min w eod hpr
             _t_w_l_s_hpr_mean = np.mean(_t_w_l_s_hpr, axis=0)
             _t_w_s_s_hpr_mean = np.mean(_t_w_s_s_hpr, axis=0)
-            _t_w_hpr = (_t_w_l_s_hpr_mean - _t_w_s_s_hpr_mean) / 2
+
+            _t_w_hpr = np.zeros(_t_w_l_s_hpr_mean.shape)
+            if get_config().LONG_LEG:
+                _t_w_hpr += _t_w_l_s_hpr_mean
+            if get_config().SHORT_LEG:
+                _t_w_hpr -= _t_w_s_s_hpr_mean
+            if get_config().LONG_LEG and get_config().SHORT_LEG:
+                _t_w_hpr /= 2
+            # _t_w_hpr = (_t_w_l_s_hpr_mean - _t_w_s_s_hpr_mean) / 2
             _min_w_eod_hpr = np.min(_t_w_hpr)
 
             # calc lower bound weekly min
             _t_w_l_s_lb_hpr_mean = np.mean(_t_w_l_s_lb_hpr, axis=0)
             _t_w_s_s_lb_hpr_mean = np.mean(_t_w_s_s_lb_hpr, axis=0)
-            _t_w_lb_hpr = (_t_w_l_s_lb_hpr_mean - _t_w_s_s_lb_hpr_mean) / 2
+
+            _t_w_lb_hpr = np.zeros(_t_w_l_s_lb_hpr_mean.shape)
+            if get_config().LONG_LEG:
+                _t_w_lb_hpr += _t_w_l_s_lb_hpr_mean
+            if get_config().SHORT_LEG:
+                _t_w_lb_hpr -= _t_w_s_s_lb_hpr_mean
+            if get_config().LONG_LEG and get_config().SHORT_LEG:
+                _t_w_lb_hpr /= 2
+            # _t_w_lb_hpr = (_t_w_l_s_lb_hpr_mean - _t_w_s_s_lb_hpr_mean) / 2
             _min_w_lb_hpr = np.min(_t_w_lb_hpr)
 
             # calc portfolio string
@@ -865,7 +967,7 @@ if get_config().GRID_SEARCH:
 
         # grid search
         get_config().SLCT_TYPE = SelectionType.FIXED
-        for get_config().SLCT_VAL in range(1, 40):
+        for get_config().SLCT_VAL in range(1, 100):
             print("FIXED %d" % get_config().SLCT_VAL)
             # for STOP_LOSS_HPR in np.linspace(-0.01, -0.30, 29 * 2 + 1):
             #     print("SL %.2f" % get_config().STOP_LOSS_HPR)
@@ -874,10 +976,14 @@ if get_config().GRID_SEARCH:
             get_config().STOP_LOSS_HPR = 0.0
             print("SL %.2f" % get_config().STOP_LOSS_HPR)
             print_rows_for_fixed_params()
-            # get_config().SLCT_TYPE = SelectionType.PCT
-            # for get_config().SLCT_VAL in np.linspace(0.5, 15, 15 * 2):
-            #     for get_config().STOP_LOSS_HPR in np.linspace(-0.01, -0.50, 49 * 2 + 1):
-            #         print_rows_for_fixed_params()
+        # get_config().SLCT_TYPE = SelectionType.PCT
+        # for get_config().SLCT_VAL in np.linspace(0.5, 15, 15 * 2):
+        #     print("PCT %d" % get_config().SLCT_VAL)
+        #     get_config().STOP_LOSS_HPR = 0.0
+        #     print("SL %.2f" % get_config().STOP_LOSS_HPR)
+        #     print_rows_for_fixed_params()
+        #     # for get_config().STOP_LOSS_HPR in np.linspace(-0.01, -0.50, 49 * 2 + 1):
+        #     #     print_rows_for_fixed_params()
 
 else:
     # plot hpr vs prob
