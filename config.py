@@ -8,6 +8,7 @@ _10M = 10000000
 _5M = 5000000
 YR_90 = datetime.datetime.strptime('1900-01-01', '%Y-%m-%d').date()
 YR_00 = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
+YR_07 = datetime.datetime.strptime('2007-01-01', '%Y-%m-%d').date()
 YR_10 = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
 YR_15 = datetime.datetime.strptime('2015-01-01', '%Y-%m-%d').date()
 
@@ -50,11 +51,11 @@ class Config(object):
 
     # train period
     TRAIN_BEG = YR_00
-    TRAIN_END = YR_10
+    TRAIN_END = YR_07
 
     # train filters
     MIN_SELECTION_STOCKS = None
-    AVG_DAY_TO_LIMIT = _10M
+    AVG_DAY_TO_LIMIT = None
     TOP_TRADABLE_STOCKS = None
     DAY_TO_LIMIT = None
     CLOSE_PX_FILTER = None
@@ -62,18 +63,18 @@ class Config(object):
 
     # cv filters
     MIN_SELECTION_STOCKS_CV = None
-    AVG_DAY_TO_LIMIT_CV = _10M
+    AVG_DAY_TO_LIMIT_CV = None
     TOP_TRADABLE_STOCKS_CV = None
     DAY_TO_LIMIT_CV = None
     CLOSE_PX_FILTER_CV = None
     SNP_FILTER_CV = True
 
     # cv params
-    CV_BEG = YR_10
+    CV_BEG = TRAIN_END
     CV_END = HIST_END
 
     SLCT_TYPE = SelectionType.FIXED
-    SLCT_VAL = 17
+    SLCT_VAL = 15
 
     STOP_LOSS_HPR = -0.0
     STOP_LOSS_TYPE = StopLossType.NO
@@ -84,7 +85,7 @@ class Config(object):
 
     PRINT_PORTFOLIO = True
 
-    LONG_LEG = True
+    LONG_LEG = False
     SHORT_LEG = True
 
 _config = Config()

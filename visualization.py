@@ -148,13 +148,13 @@ def wealth_graph(yr_avg,
         "1 usd pl sharpe: %.2f dd: %.2f%% avg y: %.2f%% avg w: %.2f%%" % (sharpe, dd * 100, yr_avg * 100, w_avg * 100))
     ax.plot_date(raw_mpl_dt[w_exit_index], wealth, color='b', fmt='-')
 
-    # fig = plt.figure()
-    # ax = fig.add_subplot(1, 1, 1, sharex=ax)
-    # draw_grid(ax)
-    # # hide_time_labels(ax)
-    # ax.set_title("1 USD PL RECAP Draw down: %.2f" % (rc_dd * 100))
-    # ax.plot_date(raw_mpl_dt[w_exit_index], rc_wealth, color='b', fmt='-')
-    # format_time_labels(ax, fmt=DDMMMYY_FMT)
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1, sharex=ax)
+    draw_grid(ax)
+    # hide_time_labels(ax)
+    ax.set_title("1 USD PL RECAP Draw down: %.2f" % (rc_dd * 100))
+    ax.plot_date(raw_mpl_dt[w_exit_index], rc_wealth, color='b', fmt='-')
+    format_time_labels(ax, fmt=DDMMMYY_FMT)
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
@@ -262,6 +262,13 @@ def wealth_csv(sl_name,
 
     progress = model_hpr
     wealth = np.cumsum(progress) + 1.0
+    wealth_beg = np.ones(shape=wealth.shape)
+    wealth_beg[1:] = wealth[:-1]
+
+    rc_progress = model_hpr + 1.00
+    rc_wealth = np.cumprod(rc_progress)
+    rc_wealth_beg = np.ones(shape=rc_wealth.shape)
+    rc_wealth_beg[1:] = rc_wealth[:-1]
 
     with open('./data/weekly_{}_sl.csv'.format(sl_name), 'w', newline='') as f:
         writer = csv.writer(f)
@@ -269,7 +276,10 @@ def wealth_csv(sl_name,
             (
                 'beg',
                 'end',
-                'wealth',
+                'cap beg',
+                'cap end',
+                'r cap beg',
+                'r cap end',
                 'hpr',
                 'min w',
                 'min w lb',
@@ -287,7 +297,10 @@ def wealth_csv(sl_name,
             writer.writerow(
                 (dt_enter.strftime('%Y-%m-%d'),
                  dt_exit.strftime('%Y-%m-%d'),
+                 wealth_beg[w],
                  wealth[w],
+                 rc_wealth_beg[w],
+                 rc_wealth[w],
                  "%.2f%%" % (model_hpr[w] * 100.0),
                  "%.2f%%" % (model_min_w_eod_hpr[w] * 100.0),
                  "%.2f%%" % (model_min_w_lb_hpr[w] * 100.0),

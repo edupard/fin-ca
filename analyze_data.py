@@ -18,8 +18,9 @@ from config import get_config, SelectionType, SelectionAlgo, StopLossType
 import progress
 
 print('loading data...')
+tickers, raw_dt, raw_data = load_npz_data_alt('data/snp.npz')
 # tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq.npz')
-tickers, raw_dt, raw_data = load_npz_data_alt('data/nyse_nasdaq.npz')
+# tickers, raw_dt, raw_data = load_npz_data_alt('data/nyse_nasdaq.npz')
 print('data load complete')
 
 raw_mpl_dt = convert_to_mpl_time(raw_dt)
@@ -937,8 +938,8 @@ if get_config().GRID_SEARCH:
                 w_avg = np.mean(model_hpr[cv_wk_beg_idx:cv_wk_end_idx])
                 w_best = np.max(model_hpr[cv_wk_beg_idx:cv_wk_end_idx])
 
-                min_min_w_eod = np.min(model_min_w_eod_hpr)
-                min_min_w_lb = np.min(model_min_w_lb_hpr)
+                min_min_w_eod = np.min(model_min_w_eod_hpr[cv_wk_beg_idx:cv_wk_end_idx])
+                min_min_w_lb = np.min(model_min_w_lb_hpr[cv_wk_beg_idx:cv_wk_end_idx])
 
                 writer.writerow(
                     (

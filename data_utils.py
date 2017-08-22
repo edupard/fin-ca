@@ -28,9 +28,62 @@ def get_snp_mask(tickers, raw_data, start_date, end_date):
     snp_curr_df = read_csv('data/snp500.csv')
     for index, row in snp_curr_df.iterrows():
         ticker = row.ticker
+        ticker = ticker.replace('.','-')
         ticker_idx = get_ticker_idx(ticker, tickers)
         if ticker_idx is not None:
             snp_mask[ticker_idx, :] = True
+        else:
+            print('Miss ticker %s' % ticker)
+
+    dt_idx_up_to = raw_data.shape[1]
+    snp_changes_df = read_csv('data/snp500_changes.csv')
+    curr_date = None
+    for index, row in snp_changes_df.iterrows():
+        ticker_add = row.Added
+        if type(ticker_add) is not str or ticker_add == "":
+            ticker_add = None
+        ticker_rem = row.Removed
+        if type(ticker_rem) is not str or ticker_rem == "":
+            ticker_rem = None
+        s_date = row.Date
+        t_d = datetime.datetime.strptime(s_date, '%B %d, %Y').date()
+        dt_idx_from = get_data_idx(t_d, start_date, end_date)
+        if curr_date is not None and t_d != curr_date:
+            dt_idx_up_to = get_data_idx(curr_date, start_date, end_date)
+        curr_date = t_d
+        if ticker_add is not None:
+            ticker_add_idx = get_ticker_idx(ticker_add, tickers)
+            if ticker_add_idx is not None:
+                snp_mask[ticker_add_idx, :dt_idx_from] = False
+                snp_mask[ticker_add_idx, dt_idx_from:dt_idx_up_to] = True
+            else:
+                print('Miss add ticker %s' % ticker_add)
+        if ticker_rem is not None:
+            ticker_rem_idx = get_ticker_idx(ticker_rem, tickers)
+            if ticker_rem_idx is not None:
+                snp_mask[ticker_rem_idx, dt_idx_from:dt_idx_up_to] = False
+            else:
+                print('Miss rem ticker %s' % ticker_rem)
+
+    return snp_mask
+
+
+def get_snp_mask_v1(tickers, raw_data, start_date, end_date):
+    def get_ticker_idx(ticker, tickers):
+        ticker_idxs = np.nonzero(tickers == ticker)
+        if ticker_idxs[0].shape[0] > 0:
+            return ticker_idxs[0][0]
+        return None
+
+    snp_mask = np.full((raw_data.shape[0], raw_data.shape[1]), False)
+    snp_curr_df = read_csv('data/snp500.csv')
+    for index, row in snp_curr_df.iterrows():
+        ticker = row.ticker
+        ticker_idx = get_ticker_idx(ticker, tickers)
+        if ticker_idx is not None:
+            snp_mask[ticker_idx, :] = True
+        else:
+            print('Miss ticker %s' % ticker)
 
     dt_idx_up_to = raw_data.shape[1]
     snp_changes_df = read_csv('data/snp500_changes.csv')
@@ -48,9 +101,13 @@ def get_snp_mask(tickers, raw_data, start_date, end_date):
         if ticker_add_idx is not None:
             snp_mask[ticker_add_idx, :dt_idx_from] = False
             snp_mask[ticker_add_idx, dt_idx_from:dt_idx_up_to] = True
+        else:
+            print('Miss add ticker %s' % ticker_add)
         ticker_rem_idx = get_ticker_idx(ticker_rem, tickers)
         if ticker_rem_idx is not None:
             snp_mask[ticker_rem_idx, dt_idx_from:dt_idx_up_to] = False
+        else:
+            print('Miss rem ticker %s' % ticker_rem)
 
     return snp_mask
 
