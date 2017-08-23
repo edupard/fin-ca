@@ -359,28 +359,29 @@ def wealth_csv(sl_name,
             #             row.ext,
             #             row.wato)
             #     )
-
-            for idx in range(_l_port_df.shape[0]):
-                p_writer.writerow(
-                    (
-                        dt_enter.strftime('%Y-%m-%d'),
-                        dt_exit.strftime('%Y-%m-%d'),
-                        'long',
-                        _l_port_df[idx, 0],
-                        _l_port_df[idx, 4],
-                        _l_port_df[idx, 1],
-                        _l_port_df[idx, 2],
-                        _l_port_df[idx, 3])
-                )
-            for idx in range(_s_port_df.shape[0]):
-                p_writer.writerow(
-                    (
-                        dt_enter.strftime('%Y-%m-%d'),
-                        dt_exit.strftime('%Y-%m-%d'),
-                        'short',
-                        _s_port_df[idx, 0],
-                        _s_port_df[idx, 4],
-                        _s_port_df[idx, 1],
-                        _s_port_df[idx, 2],
-                        _s_port_df[idx, 3])
-                )
+            if _l_port_df is not None:
+                for idx in range(_l_port_df.shape[0]):
+                    p_writer.writerow(
+                        (
+                            dt_enter.strftime('%Y-%m-%d'),
+                            dt_exit.strftime('%Y-%m-%d'),
+                            'long',
+                            _l_port_df[idx, 0],
+                            _l_port_df[idx, 4],
+                            _l_port_df[idx, 1],
+                            _l_port_df[idx, 2],
+                            _l_port_df[idx, 3])
+                    )
+            if _s_port_df is not None:
+                for idx in range(_s_port_df.shape[0]):
+                    p_writer.writerow(
+                        (
+                            dt_enter.strftime('%Y-%m-%d'),
+                            dt_exit.strftime('%Y-%m-%d'),
+                            'short',
+                            _s_port_df[idx, 0],
+                            _s_port_df[idx, 4],
+                            _s_port_df[idx, 1],
+                            _s_port_df[idx, 2],
+                            _s_port_df[idx, 3])
+                    )

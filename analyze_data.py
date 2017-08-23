@@ -438,67 +438,88 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
         _metric = np.sign(_prob_l - prob_median) * _int_r
         _metric_l = _metric[pred_long_cond]
         _metric_s = _metric[~pred_long_cond]
-        _metric_sorted_l =  np.sort(_metric_l)
+        _metric_sorted_l = np.sort(_metric_l)
         _metric_sorted_s = np.sort(_metric_s)
 
-        _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_l.shape[0])
-        _l_b = _metric_sorted_l[_sel_stks - 1]
-        _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_s.shape[0])
-        _s_b = _metric_sorted_s[_sel_stks - 1]
+        # MOD = False
+        # if MOD:
+        #     _metric_sorted_l = _metric_sorted_l[_metric_sorted_l >= 0]
+        #     _metric_sorted_s = _metric_sorted_s[_metric_sorted_s >= 0]
+        #     _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_l.shape[0])
+        #     if _sel_stks == 0:
+        #         continue
+        #     _l_b = _metric_sorted_l[_sel_stks - 1]
+        #     _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_s.shape[0])
+        #     if _sel_stks == 0:
+        #         continue
+        #     _s_b = _metric_sorted_s[_sel_stks - 1]
+        #
+        #     sel_l_cond = _s_s_l
+        #     sel_l_cond |= pred_long_cond
+        #     sel_l_cond &= (_metric <= _l_b) & (_metric >= 0)
+        #
+        #     sel_s_cond = _s_s_s
+        #     sel_s_cond |= ~pred_long_cond
+        #     sel_s_cond &= (_metric <= _s_b) & (_metric >= 0)
+        # else:
+        #     _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_l.shape[0])
+        #     _l_b = _metric_sorted_l[_sel_stks - 1]
+        #     _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_s.shape[0])
+        #     _s_b = _metric_sorted_s[_sel_stks - 1]
+        #
+        #     sel_l_cond = _s_s_l
+        #     sel_l_cond |= pred_long_cond
+        #     sel_l_cond &= (_metric <= _l_b)
+        #
+        #     sel_s_cond = _s_s_s
+        #     sel_s_cond |= ~pred_long_cond
+        #     sel_s_cond &= (_metric <= _s_b)
+
+        if get_config().SLCT_TYPE == SelectionType.PCT:
+            top_bound = np.percentile(_prob_l, 100 - get_config().SLCT_VAL)
+            bottom_bound = np.percentile(_prob_l, get_config().SLCT_VAL)
+        else:
+            _prob_l_sorted = np.sort(_prob_l)
+            _sel_stks = min(get_config().SLCT_VAL, _prob_l_sorted.shape[0])
+            bottom_bound = _prob_l_sorted[_sel_stks - 1]
+            top_bound = _prob_l_sorted[-_sel_stks]
+
+
+        long_cond = _prob_l >= top_bound
+        short_cond = _prob_l <= bottom_bound
+        _s_s_l |= long_cond
+        _s_s_s |= short_cond
+
+        l_s_int_r = _int_r[_s_s_l]
+        s_s_int_r = _int_r[_s_s_s]
+
+        if get_config().SLCT_ALG == SelectionAlgo.CONFIRMED:
+            l_int_r_t_b = np.max(l_s_int_r)
+            l_int_r_b_b = np.percentile(l_s_int_r, 100 - get_config().SLCT_PCT)
+        elif get_config().SLCT_ALG == SelectionAlgo.NON_CONFIRMED:
+            l_int_r_t_b = np.percentile(l_s_int_r, get_config().SLCT_PCT)
+            l_int_r_b_b = np.min(l_s_int_r)
+        elif get_config().SLCT_ALG == SelectionAlgo.MIDDLE:
+            l_int_r_t_b = np.percentile(l_s_int_r, 100 - get_config().SLCT_PCT / 2)
+            l_int_r_b_b = np.percentile(l_s_int_r, get_config().SLCT_PCT / 2)
+
+        if get_config().SLCT_ALG == SelectionAlgo.CONFIRMED:
+            s_int_r_t_b = np.percentile(s_s_int_r, get_config().SLCT_PCT)
+            s_int_r_b_b = np.min(s_s_int_r)
+        elif get_config().SLCT_ALG == SelectionAlgo.NON_CONFIRMED:
+            s_int_r_t_b = np.max(s_s_int_r)
+            s_int_r_b_b = np.percentile(s_s_int_r, 100 - get_config().SLCT_PCT)
+        elif get_config().SLCT_ALG == SelectionAlgo.MIDDLE:
+            s_int_r_t_b = np.percentile(s_s_int_r, 100 - get_config().SLCT_PCT / 2)
+            s_int_r_b_b = np.percentile(s_s_int_r, get_config().SLCT_PCT / 2)
 
         sel_l_cond = _s_s_l
-        sel_l_cond |= pred_long_cond
-        sel_l_cond &= (_metric <= _l_b)
+        sel_l_cond &= _int_r >= l_int_r_b_b
+        sel_l_cond &= _int_r <= l_int_r_t_b
 
         sel_s_cond = _s_s_s
-        sel_s_cond |= ~pred_long_cond
-        sel_s_cond &= (_metric <= _s_b)
-
-        # if get_config().SLCT_TYPE == SelectionType.PCT:
-        #     top_bound = np.percentile(_prob_l, 100 - get_config().SLCT_VAL)
-        #     bottom_bound = np.percentile(_prob_l, get_config().SLCT_VAL)
-        # else:
-        #     _prob_l_sorted = np.sort(_prob_l)
-        #     _sel_stks = min(get_config().SLCT_VAL, _prob_l_sorted.shape[0])
-        #     bottom_bound = _prob_l_sorted[_sel_stks - 1]
-        #     top_bound = _prob_l_sorted[-_sel_stks]
-        #
-        #
-        # long_cond = _prob_l >= top_bound
-        # short_cond = _prob_l <= bottom_bound
-        # _s_s_l |= long_cond
-        # _s_s_s |= short_cond
-        #
-        # l_s_int_r = _int_r[_s_s_l]
-        # s_s_int_r = _int_r[_s_s_s]
-        #
-        # if get_config().SLCT_ALG == SelectionAlgo.CONFIRMED:
-        #     l_int_r_t_b = np.max(l_s_int_r)
-        #     l_int_r_b_b = np.percentile(l_s_int_r, 100 - get_config().SLCT_PCT)
-        # elif get_config().SLCT_ALG == SelectionAlgo.NON_CONFIRMED:
-        #     l_int_r_t_b = np.percentile(l_s_int_r, get_config().SLCT_PCT)
-        #     l_int_r_b_b = np.min(l_s_int_r)
-        # elif get_config().SLCT_ALG == SelectionAlgo.MIDDLE:
-        #     l_int_r_t_b = np.percentile(l_s_int_r, 100 - get_config().SLCT_PCT / 2)
-        #     l_int_r_b_b = np.percentile(l_s_int_r, get_config().SLCT_PCT / 2)
-        #
-        # if get_config().SLCT_ALG == SelectionAlgo.CONFIRMED:
-        #     s_int_r_t_b = np.percentile(s_s_int_r, get_config().SLCT_PCT)
-        #     s_int_r_b_b = np.min(s_s_int_r)
-        # elif get_config().SLCT_ALG == SelectionAlgo.NON_CONFIRMED:
-        #     s_int_r_t_b = np.max(s_s_int_r)
-        #     s_int_r_b_b = np.percentile(s_s_int_r, 100 - get_config().SLCT_PCT)
-        # elif get_config().SLCT_ALG == SelectionAlgo.MIDDLE:
-        #     s_int_r_t_b = np.percentile(s_s_int_r, 100 - get_config().SLCT_PCT / 2)
-        #     s_int_r_b_b = np.percentile(s_s_int_r, get_config().SLCT_PCT / 2)
-        #
-        # sel_l_cond = _s_s_l
-        # sel_l_cond &= _int_r >= l_int_r_b_b
-        # sel_l_cond &= _int_r <= l_int_r_t_b
-        #
-        # sel_s_cond = _s_s_s
-        # sel_s_cond &= _int_r <= s_int_r_t_b
-        # sel_s_cond &= _int_r >= s_int_r_b_b
+        sel_s_cond &= _int_r <= s_int_r_t_b
+        sel_s_cond &= _int_r >= s_int_r_b_b
 
         # select long and short stocks in portfolio
         _stocks = stocks[beg:end]
@@ -977,14 +998,14 @@ if get_config().GRID_SEARCH:
             get_config().STOP_LOSS_HPR = 0.0
             print("SL %.2f" % get_config().STOP_LOSS_HPR)
             print_rows_for_fixed_params()
-        # get_config().SLCT_TYPE = SelectionType.PCT
-        # for get_config().SLCT_VAL in np.linspace(0.5, 15, 15 * 2):
-        #     print("PCT %d" % get_config().SLCT_VAL)
-        #     get_config().STOP_LOSS_HPR = 0.0
-        #     print("SL %.2f" % get_config().STOP_LOSS_HPR)
-        #     print_rows_for_fixed_params()
-        #     # for get_config().STOP_LOSS_HPR in np.linspace(-0.01, -0.50, 49 * 2 + 1):
-        #     #     print_rows_for_fixed_params()
+            # get_config().SLCT_TYPE = SelectionType.PCT
+            # for get_config().SLCT_VAL in np.linspace(0.5, 15, 15 * 2):
+            #     print("PCT %d" % get_config().SLCT_VAL)
+            #     get_config().STOP_LOSS_HPR = 0.0
+            #     print("SL %.2f" % get_config().STOP_LOSS_HPR)
+            #     print_rows_for_fixed_params()
+            #     # for get_config().STOP_LOSS_HPR in np.linspace(-0.01, -0.50, 49 * 2 + 1):
+            #     #     print_rows_for_fixed_params()
 
 else:
     # plot hpr vs prob

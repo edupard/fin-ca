@@ -44,7 +44,7 @@ class Config(object):
     EXIT_ON_MON = False
     EXIT_ON_MON_OPEN = True
 
-    SLCT_PCT = 50
+    SLCT_PCT = 100
     SLCT_ALG = SelectionAlgo.NON_CONFIRMED
 
     MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 30
@@ -85,8 +85,8 @@ class Config(object):
 
     PRINT_PORTFOLIO = True
 
-    LONG_LEG = False
-    SHORT_LEG = True
+    LONG_LEG = True
+    SHORT_LEG = False
 
 _config = Config()
 
