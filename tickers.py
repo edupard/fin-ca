@@ -60,12 +60,36 @@ def get_nasdaq_tickers():
     tickers = t_df_nasdaq['ticker'].tolist()
     return tickers
 
+
 def get_snp_tickers():
     tickers = []
     snp_curr_df = read_csv('data/snp500.csv')
     for index, row in snp_curr_df.iterrows():
         ticker = row.ticker
-        ticker = ticker.replace('.','-')
+        ticker = ticker.replace('.', '-')
+        tickers.append(ticker)
+
+    snp_changes_df = read_csv('data/snp500_changes.csv')
+    for index, row in snp_changes_df.iterrows():
+        ticker_add = row.Added
+        if type(ticker_add) is not str or ticker_add == "":
+            ticker_add = None
+        ticker_rem = row.Removed
+        if type(ticker_rem) is not str or ticker_rem == "":
+            ticker_rem = None
+        if ticker_add is not None:
+            tickers.append(ticker_add)
+        if ticker_rem is not None:
+            tickers.append(ticker_rem)
+
+    return list(set(tickers))
+
+def get_snp_tickers_incorrect():
+    tickers = []
+    snp_curr_df = read_csv('data/snp500.csv')
+    for index, row in snp_curr_df.iterrows():
+        ticker = row.ticker
+        ticker = ticker.replace('.', '-')
         tickers.append(ticker)
 
     snp_changes_df = read_csv('data/snp500_changes.csv')
@@ -82,3 +106,13 @@ def get_snp_tickers():
             tickers.append(ticker)
 
     return list(set(tickers))
+
+def get_snp_tickers_exch_map():
+    exch_map = {}
+    snp_curr_df = read_csv('data/snp500_exchange.csv')
+    for index, row in snp_curr_df.iterrows():
+        ticker = row.ticker
+        ticker = ticker.replace('.', '-')
+        exchange = row.exchange
+        exch_map[ticker] = exchange
+    return exch_map

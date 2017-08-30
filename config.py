@@ -42,7 +42,7 @@ class Config(object):
     ENT_ON_MON = True
     ENT_MON_OPEN = False
     EXIT_ON_MON = False
-    EXIT_ON_MON_OPEN = True
+    EXIT_ON_MON_OPEN = False
 
     SLCT_PCT = 100
     SLCT_ALG = SelectionAlgo.NON_CONFIRMED
@@ -74,7 +74,7 @@ class Config(object):
     CV_END = HIST_END
 
     SLCT_TYPE = SelectionType.FIXED
-    SLCT_VAL = 15
+    SLCT_VAL = 23
 
     STOP_LOSS_HPR = -0.0
     STOP_LOSS_TYPE = StopLossType.NO
@@ -85,8 +85,11 @@ class Config(object):
 
     PRINT_PORTFOLIO = True
 
-    LONG_LEG = True
-    SHORT_LEG = False
+    LONG_ALLOC_PCT = 0.7
+    SHORT_ALLOC_PCT = 1 - LONG_ALLOC_PCT
+
+    # LONG_LEG = True
+    # SHORT_LEG = False
 
 _config = Config()
 

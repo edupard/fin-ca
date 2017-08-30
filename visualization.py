@@ -11,6 +11,7 @@ from config import get_config
 DDMMMYY_FMT = matplotlib.dates.DateFormatter('%y %b %d')
 YYYY_FMT = matplotlib.dates.DateFormatter('%Y')
 
+
 def plot_stock_returns(r, mpl_dt):
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -26,6 +27,7 @@ def plot_stock_returns(r, mpl_dt):
     neg_r = r[neg_mask]
     neg_mpl_dt = mpl_dt[neg_mask]
     ax.plot_date(neg_mpl_dt, neg_r, color='r', fmt='o')
+
 
 def plot_20_random_stock_prices(raw_data, raw_mpl_dt):
     fig = plt.figure()
@@ -185,14 +187,15 @@ def calc_wealth(model_hpr, w_enter_index, raw_dt):
 
         return np.min(dd_a)
 
-    def calc_sharp(r):
-        return math.sqrt(r.shape[0]) * np.mean(r) / np.std(r)
+    def calc_sharpe(r):
+        years = (get_config().CV_END - get_config().CV_BEG).days / 365
+        return math.sqrt(r.shape[0] / years) * np.mean(r) / np.std(r)
 
     # calc dd, sharp
     progress = model_hpr
     wealth = np.cumsum(progress) + 1.0
     dd = calc_dd(wealth, False)
-    sharpe = calc_sharp(model_hpr)
+    sharpe = calc_sharpe(model_hpr)
 
     # calc recap dd
     rc_progress = (model_hpr) + 1.00
@@ -203,7 +206,7 @@ def calc_wealth(model_hpr, w_enter_index, raw_dt):
     rc_base = np.cumprod(rc_progress)
     rc_r = (rc_base[1:] - rc_base[:-1]) / rc_base[:-1]
     rc_r = np.concatenate([np.array([rc_base[0] - 1.]), rc_r])
-    rc_sharpe = calc_sharp(rc_r)
+    rc_sharpe = calc_sharpe(rc_r)
 
     # calc return by years
     yr = []

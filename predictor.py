@@ -1,8 +1,9 @@
 from download_utils import download_data, parse_tickers, load_npz_data, load_npz_data_alt, preprocess_data
 from data_utils import filter_activelly_tradeable_stocks, get_dates_for_daily_return, get_dates_for_weekly_return, \
     get_tradable_stock_indexes, get_prices, get_price, get_price_idx, PxType, DATA_TO_IDX, \
-    calc_z_score, get_data_idx, calc_z_score_alt
-from tickers import get_nasdaq_tickers
+    calc_z_score, get_data_idx, calc_z_score_alt, get_tradable_stocks_mask
+from tickers import get_nasdaq_tickers, get_nyse_tickers, get_snp_tickers, get_nyse_nasdaq_tickers, get_snp_tickers_exch_map
+from config import get_config
 import datetime
 import numpy as np
 import csv
@@ -16,10 +17,12 @@ PERCENTILE = 10
 TODAY = datetime.datetime.today().date()
 
 ONLINE = False
+
+OPEN_PX_TYPE = PxType.CLOSE
 # YYYY-MM-DD
-PREDICTION_DATE = datetime.datetime.strptime('2017-07-28', '%Y-%m-%d').date()
-OPEN_POS_DATE = datetime.datetime.strptime('2017-07-28', '%Y-%m-%d').date()
-HPR_DATE = datetime.datetime.strptime('2017-08-04', '%Y-%m-%d').date()
+PREDICTION_DATE = datetime.datetime.strptime('2017-08-25', '%Y-%m-%d').date()
+OPEN_POS_DATE = datetime.datetime.strptime('2017-08-25', '%Y-%m-%d').date()
+HPR_DATE = datetime.datetime.strptime('2017-08-28', '%Y-%m-%d').date()
 # PREDICTION_DATE = datetime.datetime.strptime('2017-08-04', '%Y-%m-%d').date()
 # OPEN_POS_DATE = datetime.datetime.strptime('2017-08-04', '%Y-%m-%d').date()
 # HPR_DATE = datetime.datetime.strptime('2017-08-04', '%Y-%m-%d').date()
@@ -28,22 +31,29 @@ HPR_DATE = datetime.datetime.strptime('2017-08-04', '%Y-%m-%d').date()
 START_DATE = PREDICTION_DATE - datetime.timedelta(days=(NUM_WEEKS + 2) * 7)
 END_DATE = HPR_DATE
 
-tickers = get_nasdaq_tickers()
+ticker_exch_map = get_snp_tickers_exch_map()
+tickers = list(ticker_exch_map.keys())
 download_data(tickers, 'data/history.csv', START_DATE, END_DATE, 50)
 preprocess_data(tickers, 'data/history.csv', START_DATE, END_DATE, 'data/history.npz', True)
 tickers, raw_dt, raw_data = load_npz_data_alt('data/history.npz')
 
-mask, traded_stocks = filter_activelly_tradeable_stocks(raw_data)
+tradable_mask = get_tradable_stocks_mask(raw_data)
+tradable_stocks_per_day = tradable_mask[:, :].sum(0)
+trading_day_mask = tradable_stocks_per_day > get_config().MIN_STOCKS_TRADABLE_PER_TRADING_DAY
 
-# TODO: replace volume from last day rather than change mask
+def ib_convert_ticker(ticker):
+    ticker = ticker.replace('-',' ')
+    ticker = ticker.replace('.', ' ')
+    return ticker
+
 if ONLINE:
     # mark all stocks tradeable
-    mask[:, -1] = True
-    traded_stocks[-1] = mask.shape[0]
+    tradable_mask[:, -1] = True
+    trading_day_mask[-1] = True
 
-w_r_i = get_dates_for_weekly_return(START_DATE, END_DATE, traded_stocks, PREDICTION_DATE, NUM_WEEKS)
-d_r_i = get_dates_for_daily_return(START_DATE, END_DATE, traded_stocks, PREDICTION_DATE, NUM_DAYS)
-t_s_i = get_tradable_stock_indexes(mask, w_r_i + d_r_i)
+w_r_i = get_dates_for_weekly_return(START_DATE, END_DATE, trading_day_mask, PREDICTION_DATE, NUM_WEEKS)
+d_r_i = get_dates_for_daily_return(START_DATE, END_DATE, trading_day_mask, PREDICTION_DATE, NUM_DAYS)
+t_s_i = get_tradable_stock_indexes(tradable_mask, w_r_i + d_r_i)
 d_c = get_prices(raw_data, t_s_i, d_r_i, PxType.CLOSE)
 w_c = get_prices(raw_data, t_s_i, w_r_i, PxType.CLOSE)
 # dr = calc_z_score(d_c)
@@ -194,7 +204,7 @@ CSV_OPEN_POS_DATE = get_csv_date_string(OPEN_POS_DATE_IDX)
 with open('./data/prediction.csv', 'w', newline='') as f:
     writer = csv.writer(f)
     writer.writerow(
-        ('ticker', 'long prob', 'class', '1w', '1d', '*', '#', 'hp', '1w px', '1d px', '* px', '# px', 'hp px',
+        ('ticker', 'exchange', 'long prob', 'class', '1w', '1d', '*', '#', 'hp', '1w px', '1d px', '* px', '# px', 'hp px',
          '1wr pct', '1dr pct',
          'hpr pct', '1d v', '1w avg v'))
 
@@ -213,8 +223,7 @@ with open('./data/prediction.csv', 'w', newline='') as f:
         _pred_px = get_price(raw_data, ticker_idx, PREDICTION_DATE_IDX, PxType.CLOSE)
         _hp_px = get_price(raw_data, ticker_idx, HPR_DATE_IDX, PxType.CLOSE)
 
-        _open_px = get_price(raw_data, ticker_idx, HPR_DATE_IDX,
-                             PxType.CLOSE if OPEN_POS_DATE <= PREDICTION_DATE else PxType.OPEN)
+        _open_px = get_price(raw_data, ticker_idx, OPEN_POS_DATE_IDX, OPEN_PX_TYPE)
 
         _week_gross_volume = raw_data[ticker_idx, d_r_i[1:], DATA_TO_IDX]
         _last_day_gross_volume = _week_gross_volume[4]
@@ -229,7 +238,8 @@ with open('./data/prediction.csv', 'w', newline='') as f:
         _1dr_pct = get_pct(_1d_px, _pred_px)
         _hpr_pct = get_pct(_open_px, _hp_px)
 
-        writer.writerow((ticker,
+        writer.writerow((ib_convert_ticker(ticker),
+                         ticker_exch_map[ticker],
                          long_prob,
                          _class,
                          CSV_ONE_WEEK_DATE,

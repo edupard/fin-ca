@@ -2,16 +2,18 @@ import csv
 import datetime
 import pandas as pd
 
-DATE = datetime.datetime.strptime('2017-07-28', '%Y-%m-%d')
+DATE = datetime.datetime.strptime('2017-08-28', '%Y-%m-%d')
 DT_COLUMN = 'Ib time'
 
 
-df = pd.read_csv('executions.csv')
+df = pd.read_csv('data/executions.csv')
 df[DT_COLUMN] =  pd.to_datetime(df[DT_COLUMN], format='%Y-%m-%d %H:%M:%S')
 mask = (df[DT_COLUMN] > DATE) & (df[DT_COLUMN] < (DATE + datetime.timedelta(days=1)))
 df = df.loc[mask]
 
-result = pd.DataFrame(columns=('ticker', 'pos', 'px'))
+px_df = pd.read_csv('data/prediction.csv')
+
+result = pd.DataFrame(columns=('ticker', 'pos', 'px','fri px','mon px'))
 
 i = 0
 tickers = df.LocalSymbol.unique()
@@ -25,8 +27,14 @@ for ticker in tickers:
         gross_px += row.Position * row.Price
     avg_px = gross_px / pos
 
-    result.loc[i] = [ticker, pos, avg_px]
+    ticker_px_df = px_df[px_df.ticker==ticker]
+
+    fri_px = ticker_px_df.iloc[0]['* px']
+    mon_px = ticker_px_df.iloc[0]['hp px']
+
+    result.loc[i] = [ticker, pos, avg_px, fri_px, mon_px]
     i += 1
 
 result = result.sort_values('ticker')
-result.to_csv('avg_px.csv')
+
+result.to_csv('data/avg_px.csv', index=False)
