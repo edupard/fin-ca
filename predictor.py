@@ -1,4 +1,4 @@
-from download_utils import download_data, parse_tickers, load_npz_data, load_npz_data_alt, preprocess_data
+from download_utils import download_data, parse_tickers, load_npz_data_old, load_npz_data, preprocess_data
 from data_utils import filter_activelly_tradeable_stocks, get_dates_for_daily_return, get_dates_for_weekly_return, \
     get_tradable_stock_indexes, get_prices, get_price, get_price_idx, PxType, DATA_TO_IDX, \
     calc_z_score, get_data_idx, calc_z_score_alt, get_tradable_stocks_mask
@@ -20,9 +20,9 @@ ONLINE = False
 
 OPEN_PX_TYPE = PxType.CLOSE
 # YYYY-MM-DD
-PREDICTION_DATE = datetime.datetime.strptime('2017-08-25', '%Y-%m-%d').date()
-OPEN_POS_DATE = datetime.datetime.strptime('2017-08-25', '%Y-%m-%d').date()
-HPR_DATE = datetime.datetime.strptime('2017-08-28', '%Y-%m-%d').date()
+PREDICTION_DATE = datetime.datetime.strptime('2017-09-01', '%Y-%m-%d').date()
+OPEN_POS_DATE = datetime.datetime.strptime('2017-09-01', '%Y-%m-%d').date()
+HPR_DATE = datetime.datetime.strptime('2017-09-05', '%Y-%m-%d').date()
 # PREDICTION_DATE = datetime.datetime.strptime('2017-08-04', '%Y-%m-%d').date()
 # OPEN_POS_DATE = datetime.datetime.strptime('2017-08-04', '%Y-%m-%d').date()
 # HPR_DATE = datetime.datetime.strptime('2017-08-04', '%Y-%m-%d').date()
@@ -34,8 +34,8 @@ END_DATE = HPR_DATE
 ticker_exch_map = get_snp_tickers_exch_map()
 tickers = list(ticker_exch_map.keys())
 download_data(tickers, 'data/history.csv', START_DATE, END_DATE, 50)
-preprocess_data(tickers, 'data/history.csv', START_DATE, END_DATE, 'data/history.npz', True)
-tickers, raw_dt, raw_data = load_npz_data_alt('data/history.npz')
+preprocess_data(tickers, 'data/history.csv', START_DATE, END_DATE, 'data/history.npz', get_config().ADJ_PX_FEATURES)
+tickers, raw_dt, raw_data = load_npz_data('data/history.npz')
 
 tradable_mask = get_tradable_stocks_mask(raw_data)
 tradable_stocks_per_day = tradable_mask[:, :].sum(0)

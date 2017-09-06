@@ -10,7 +10,7 @@ from data_utils import filter_activelly_tradeable_stocks, convert_to_mpl_time, g
     get_one_trading_date, get_dates_for_weekly_return, get_tradable_stock_indexes, get_prices, \
     PxType, calc_z_score, get_tradable_stocks_mask, get_intermediate_dates, get_snp_mask, get_active_stks, \
     get_top_tradable_stks, get_stks_with_price_above, get_avg_stk_to
-from download_utils import load_npz_data, load_npz_data_alt
+from download_utils import load_npz_data_old, load_npz_data
 from visualization import wealth_graph, confusion_matrix, wealth_csv, calc_wealth
 from visualization import plot_20_random_stock_prices, plot_traded_stocks_per_day, plot_stock_returns
 from nn import train_ae, train_ffnn, train_rbm, evaluate_ffnn
@@ -18,7 +18,7 @@ from config import get_config, SelectionType, SelectionAlgo, StopLossType
 import progress
 
 print('loading data...')
-tickers, raw_dt, raw_data = load_npz_data_alt('data/snp_bad.npz')
+tickers, raw_dt, raw_data = load_npz_data('data/snp_bad.npz')
 # tickers, raw_dt, raw_data = load_npz_data_alt('data/nasdaq.npz')
 # tickers, raw_dt, raw_data = load_npz_data_alt('data/nyse_nasdaq.npz')
 print('data load complete')

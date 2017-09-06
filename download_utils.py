@@ -6,7 +6,6 @@ from enum import Enum
 import numpy as np
 import os
 
-
 from tiingo import get_historical_data
 
 tickers = []
@@ -37,7 +36,8 @@ class Writer:
         print('downloading data...')
         with open(self.FILE_NAME, 'w', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow(('ticker', 'date', 'o', 'c', 'h', 'l', 'v', 'adj_o', 'adj_c', 'adj_h', 'adj_l', 'adj_v', 'div', 'split'))
+            writer.writerow(('ticker', 'date', 'o', 'c', 'h', 'l', 'v', 'adj_o', 'adj_c', 'adj_h', 'adj_l', 'adj_v',
+                             'div', 'split'))
             while True:
                 p = self.queue.get()
                 if p.payload_type == PayloadType.TASK_COMPLETED:
@@ -61,7 +61,8 @@ class Writer:
                             split_factor = d['splitFactor']
                             dt = d['date'].split("T")[0]
                             t = p.ticker
-                            writer.writerow((t, dt, o, c, h, l, v, adj_o, adj_c, adj_h, adj_l, adj_v, div_cash, split_factor))
+                            writer.writerow(
+                                (t, dt, o, c, h, l, v, adj_o, adj_c, adj_h, adj_l, adj_v, div_cash, split_factor))
                     except:
                         pass
         print('download completed!')
@@ -136,7 +137,7 @@ def download_data(tickers, FILE_NAME, START_DATE, END_DATE, NUM_WORKERS=20):
     writer.join()
 
 
-def preprocess_data(tickers, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME, use_adj_px):
+def preprocess_data(tickers, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME, features):
     print('preprocessing data...')
 
     ticker_to_idx = {}
@@ -149,7 +150,27 @@ def preprocess_data(tickers, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME, us
     days = (END_DATE - START_DATE).days
     data_points = days + 1
 
-    raw_data = np.zeros((num_tickers, data_points, 6))
+    idx_map = {
+        'o': 0,
+        'c': 1,
+        'h': 2,
+        'l': 3,
+        'v': 4,
+        'a_o': 5,
+        'a_c': 6,
+        'a_h': 7,
+        'a_l': 8,
+        'a_v': 9,
+        'to': 10
+    }
+
+    features_len = len(features)
+    raw_data = np.zeros((num_tickers, data_points, features_len))
+    idx_arr = np.zeros((features_len), dtype=np.int)
+    for i in range(features_len):
+        idx_arr[i] = idx_map.get(features[i])
+    data_arr = np.zeros(len(idx_map))
+
     raw_dt = np.zeros((data_points))
     for idx in range(data_points):
         date = START_DATE + datetime.timedelta(days=idx)
@@ -160,8 +181,10 @@ def preprocess_data(tickers, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME, us
     num_lines = sum(1 for line in open(FILE_NAME))
     line = 0
     curr_progress = 0
-    with open(FILE_NAME, 'r') as csvfile:
-        reader = csv.reader(csvfile)
+    # with open(FILE_NAME, 'r') as csv_file, open('data/snp/errors.csv', 'w') as csv_error_file:
+    with open(FILE_NAME, 'r') as csv_file:
+        reader = csv.reader(csv_file)
+        # writer = csv.writer(csv_error_file)
         for row in reader:
             line += 1
             if line == 1:
@@ -195,44 +218,41 @@ def preprocess_data(tickers, FILE_NAME, START_DATE, END_DATE, DUMP_FILE_NAME, us
                 # s_f = float(row[13])
                 to = v * c
 
-                if use_adj_px:
-                    raw_data[ticker_idx, dt_idx, 0] = a_o
-                    raw_data[ticker_idx, dt_idx, 1] = a_h
-                    raw_data[ticker_idx, dt_idx, 2] = a_l
-                    raw_data[ticker_idx, dt_idx, 3] = a_c
-                    raw_data[ticker_idx, dt_idx, 4] = a_v
-                    raw_data[ticker_idx, dt_idx, 5] = to
-                else:
-                    raw_data[ticker_idx, dt_idx, 0] = o
-                    raw_data[ticker_idx, dt_idx, 1] = h
-                    raw_data[ticker_idx, dt_idx, 2] = l
-                    raw_data[ticker_idx, dt_idx, 3] = c
-                    raw_data[ticker_idx, dt_idx, 4] = v
-                    raw_data[ticker_idx, dt_idx, 5] = to
+                data_arr[0] = o
+                data_arr[1] = c
+                data_arr[2] = h
+                data_arr[3] = l
+                data_arr[4] = v
+                data_arr[5] = a_o
+                data_arr[6] = a_c
+                data_arr[7] = a_h
+                data_arr[8] = a_l
+                data_arr[9] = a_v
+                data_arr[10] = to
+
+                for i in range(features_len):
+                    raw_data[ticker_idx, dt_idx, i] = data_arr[idx_arr[i]]
             except:
+                # writer.writerow(row)
                 pass
 
     np_tickers = np.array(tickers, dtype=np.object)
     print('')
     print('saving file...')
-    np.savez(DUMP_FILE_NAME, raw_tickers = np_tickers, raw_dt=raw_dt, raw_data=raw_data)
+    np.savez(DUMP_FILE_NAME, raw_tickers=np_tickers, raw_dt=raw_dt, raw_data=raw_data)
     print('preprocessing completed!')
 
-def load_npz_data(DUMP_FILE_NAME):
+
+def load_npz_data_old(DUMP_FILE_NAME):
     input = np.load(DUMP_FILE_NAME)
     raw_dt = input['raw_dt']
     raw_data = input['raw_data']
-    return  raw_dt, raw_data
+    return raw_dt, raw_data
 
-def load_npz_data_alt(DUMP_FILE_NAME):
+
+def load_npz_data(DUMP_FILE_NAME):
     input = np.load(DUMP_FILE_NAME)
     raw_tickers = input['raw_tickers']
     raw_dt = input['raw_dt']
     raw_data = input['raw_data']
     return raw_tickers, raw_dt, raw_data
-
-
-
-
-
-

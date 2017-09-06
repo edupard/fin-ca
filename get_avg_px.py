@@ -2,7 +2,7 @@ import csv
 import datetime
 import pandas as pd
 
-DATE = datetime.datetime.strptime('2017-08-28', '%Y-%m-%d')
+DATE = datetime.datetime.strptime('2017-09-05', '%Y-%m-%d')
 DT_COLUMN = 'Ib time'
 
 

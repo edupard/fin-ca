@@ -14,4 +14,11 @@ Only record for GOOGL exists
 April 3, 2014	GOOGL	Google Inc.			Google Class C share distribution[82]
 =>add same addition record for GOOG + correct added date in snp.csv
 
- 
+Tickers which has different name on tiingo or absent
+EK->KODK  KODAK
+SLE->HS Sara lee->Hillshire brands (Sara lee split, HSH ticker represent SLE prices before split)
+QTRN->no data in tiingo, it was excluded from SNP on September 25, 2003 and taken private then on August 29, 2017 it successor Q QuintilesIMS was added to SNP
+=> we just miss data on this stock
+ABK->AMBC(new ticker name), but previous data(2000-2008 when it was SNP component) miss
+BS->no data on Bethlehem steel
+TE->no data on TECO energy in tiingo

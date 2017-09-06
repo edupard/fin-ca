@@ -1,4 +1,4 @@
-from download_utils import download_data, parse_tickers, load_npz_data, load_npz_data_alt, preprocess_data
+from download_utils import download_data, parse_tickers, load_npz_data_old, load_npz_data, preprocess_data
 from data_utils import filter_activelly_tradeable_stocks, get_dates_for_daily_return, get_dates_for_weekly_return, \
     get_tradable_stock_indexes, get_prices, PxType, calc_z_score, get_data_idx, calc_z_score_alt
 from tickers import get_nasdaq_tickers

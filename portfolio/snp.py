@@ -2,14 +2,26 @@ import pandas as pd
 import datetime
 import math
 
-from download_utils import download_data
+from download_utils import download_data, preprocess_data
 from portfolio.config import get_config
 
+WIKI_TIINGO_TICKERS_MAP = {
+    'EK' : 'KODK',
+    'SLE' : 'HSH'
+}
+
+def rename_wiki_ticker_to_tiingo_ticker(wiki_ticker):
+    tiingo_ticker = WIKI_TIINGO_TICKERS_MAP.get(wiki_ticker, wiki_ticker)
+    return tiingo_ticker.replace('.', '-')
 
 def download_snp_px():
     tickers = get_snp_hitorical_components_tickers()
-    download_data(tickers, get_config().HIST_BEG, get_config().HIST_END, 'data/snp/snp_px.csv')
+    download_data(tickers, 'data/snp/snp_px.csv', get_config().HIST_BEG, get_config().HIST_END, )
 
+def preprocess_snp_px():
+    tickers = get_snp_hitorical_components_tickers()
+    preprocess_data(tickers, 'data/snp/snp_px.csv', get_config().HIST_BEG, get_config().HIST_END, 'data/snp/snp_px.npz',
+                    get_config().DATA_FEATURES)
 
 def get_snp_hitorical_components_tickers():
     snp_mask_df = pd.read_csv('data/snp/snp_mask.csv')
@@ -25,9 +37,6 @@ def generate_snp_mask():
     snp_changes_df = snp_changes_df.rename(index=str, columns={"Date": "date"})
 
     changes = {}
-
-    def convert_to_tiingo_ticker(ticker):
-        return ticker.replace('.', '-')
 
     def add_change(ticker, date, added):
         if ticker not in changes:
@@ -64,7 +73,8 @@ def generate_snp_mask():
                     continue
                 return None
             if not added:
-                periods.append((prev_date, date))
+                # subtract one day because ticker already absent on index at removal date
+                periods.append((prev_date, date - datetime.timedelta(days=1)))
             in_index = added
             prev_date = date
         return periods
@@ -78,7 +88,7 @@ def generate_snp_mask():
             print(ticker)
         else:
             for _from, _to in periods:
-                row = [convert_to_tiingo_ticker(ticker), _from, _to]
+                row = [rename_wiki_ticker_to_tiingo_ticker(ticker), _from, _to]
                 snp_mask_df.loc[i] = row
                 i += 1
 
