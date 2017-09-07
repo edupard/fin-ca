@@ -8,6 +8,8 @@ class TradingFrequency(Enum):
 class NetVersion(Enum):
     APPLE = 0
     BANANA = 1
+    WORM = 2
+    SNAKE = 3
 
 class Mode(Enum):
     TRAIN = 0
@@ -61,7 +63,7 @@ class Config(object):
 
     MIN_PARTITION_Z = 1e-6
 
-    NET_VER = NetVersion.BANANA
+    NET_VER = NetVersion.APPLE
     TRAIN_STAT_PATH = 'nets/portfolio/%s/train_stat.csv' % NET_VER.name
     WEIGHTS_PATH = 'nets/portfolio/%s/weights' % NET_VER.name
 
@@ -70,7 +72,9 @@ class Config(object):
     BATCH_NORM = True
 
     MODE = Mode.TEST
-    EPOCH_WEIGHTS_TO_LOAD = None
+    EPOCH_WEIGHTS_TO_LOAD = 94
+
+    COVARIANCE_LENGTH = 20
 
 
 _config = Config()
