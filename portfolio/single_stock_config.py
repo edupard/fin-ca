@@ -1,33 +1,25 @@
 import datetime
 from enum import Enum
 
-class TradingFrequency(Enum):
-    DAILY = 0
-    WEEKLY = 1
-
-class NetVersion(Enum):
-    APPLE = 0
-    BANANA = 1
-    WORM = 2
-    SNAKE = 3
-    CAT = 4
-    COW = 5
 
 class Mode(Enum):
     TRAIN = 0
     TEST = 1
+
 
 YR_90 = datetime.datetime.strptime('1990-01-01', '%Y-%m-%d').date()
 YR_00 = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
 YR_07 = datetime.datetime.strptime('2007-01-01', '%Y-%m-%d').date()
 YR_10 = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
 YR_15 = datetime.datetime.strptime('2015-01-01', '%Y-%m-%d').date()
+TODAY = datetime.datetime.strptime('2017-08-27', '%Y-%m-%d').date()
 
 
 class Config(object):
+    TICKER = 'WMT'
 
-    HIST_BEG = datetime.datetime.strptime('1999-01-01', '%Y-%m-%d').date()
-    HIST_END = datetime.datetime.strptime('2017-08-27', '%Y-%m-%d').date()
+    HIST_BEG = YR_90
+    HIST_END = TODAY
 
     DATA_FEATURES = ['o', 'h', 'l', 'c', 'v', 'a_o', 'a_h', 'a_l', 'a_c', 'a_v']
 
@@ -42,50 +34,32 @@ class Config(object):
     ADJ_CLOSE_DATA_IDX = 8
     ADJ_VOLUME_DATA_IDX = 9
 
-    MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 30
-
-    LOG_RET = False
-    RET_MUL = 1
-    LOG_VOL_CHG = False
-    VOL_CHG_MUL = 1
-
-    RNN_HISTORY = datetime.timedelta(days=20)
-    TRADING_PERIOD_DAYS = 1
-
-    LSTM_LAYERS_SIZE = [5,5,5]
+    LSTM_LAYERS_SIZE = [15, 15, 15]
     FC_LAYERS_SIZE = [30]
 
     TRAIN_BEG = YR_00
     TRAIN_END = YR_07
 
-    SHUFFLE = True
-
     TEST_BEG = YR_07
     TEST_END = HIST_END
-
-    MIN_PARTITION_Z = 1e-6
-
-    NET_VER = NetVersion.COW
-    TRAIN_STAT_PATH = 'nets/portfolio/%s/train_stat.csv' % NET_VER.name
-    WEIGHTS_PATH = 'nets/portfolio/%s/weights' % NET_VER.name
-
-    PRINT_PREDICTION = False
-
-    BATCH_NORM = True
 
     MODE = Mode.TRAIN
     EPOCH_WEIGHTS_TO_LOAD = None
 
-    COVARIANCE_LENGTH = 20
+    BPTT_STEPS = 100
+    PRED_HORIZON = 5
 
-    SKIP_NON_TRADING_DAYS = True
-    MIN_VARIANCE = 1e-6
+    WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/%s' % TICKER
+    TRAIN_STAT_PATH = '%s/train_stat.csv' % WEIGHTS_FOLDER_PATH
+    WEIGHTS_PATH = '%s/weights' % WEIGHTS_FOLDER_PATH
 
-    # LEARNING_RATE = 0.001
-    LEARNING_RATE = 0.0001
+    DATA_FOLDER_PATH = 'data/stocks/%s' % TICKER
+    DATA_PATH = '%s/%s.csv' % (DATA_FOLDER_PATH, TICKER)
+    DATA_NPZ_PATH = '%s/%s.npz' % (DATA_FOLDER_PATH, TICKER)
 
 
 _config = Config()
+
 
 def get_config() -> Config:
     return _config

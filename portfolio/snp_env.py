@@ -5,6 +5,7 @@ import pandas as pd
 from download_utils import load_npz_data
 from portfolio.config import get_config
 
+
 class SnpEnv(object):
     def __init__(self):
         print('loading data...')
@@ -23,6 +24,7 @@ class SnpEnv(object):
         self.tradable_mask = np.all(self.raw_data > 0.0, axis=2)
         self.traded_stocks_per_day = self.tradable_mask[:, :].sum(0)
         self.trading_day_mask = self.traded_stocks_per_day > get_config().MIN_STOCKS_TRADABLE_PER_TRADING_DAY
+        self.trading_day_idxs = np.nonzero(self.trading_day_mask)[0]
 
         # calc snp_mask
         self.snp_mask = np.full((self.stks, self.days), False)
@@ -123,16 +125,52 @@ class SnpEnv(object):
     def _idx_to_ticker(self, idx):
         return self.tickers[idx]
 
-    def get_input(self, stk_mask, beg, end):
-        return self.x[stk_mask, self._date_to_idx(beg): self._date_to_idx(end), :]
+    def get_input(self, stk_mask, end):
+        end_idx = self._date_to_idx(end)
+        if get_config().SKIP_NON_TRADING_DAYS:
+            history = get_config().RNN_HISTORY.days
+            valid_trading_day_idxs = np.nonzero(self.trading_day_idxs<=end_idx)[0]
+            history_trading_day_idxs = self.trading_day_idxs[valid_trading_day_idxs[-history:]]
+            x = self.x[:, history_trading_day_idxs, :]
+            return x[stk_mask,:,:]
+        else:
+            beg = end - get_config().RNN_HISTORY
+            beg_idx = self._date_to_idx(beg)
+            return self.x[stk_mask, beg_idx : end_idx, :]
 
-    def get_snp_components_mask(self, date):
-        # return self.snp_mask[:, self._date_to_idx(date)]
+    def get_tradeable_snp_components_mask(self, date):
         return self.snp_mask[:, self._date_to_idx(date)] & self.tradable_mask[:, self._date_to_idx(date)]
 
     def get_ret_lbl(self, stk_mask, ent, ext):
-        ent_px = self.raw_data[stk_mask, self._date_to_idx(ent), get_config().ADJ_CLOSE_DATA_IDX]
-        ext_px = self.raw_data[stk_mask, self._date_to_idx(ext), get_config().ADJ_CLOSE_DATA_IDX]
+        ent_idx = self._date_to_idx(ent)
+        ext_idx = self._date_to_idx(ext)
+        ent_px = self.raw_data[stk_mask, ent_idx, get_config().ADJ_CLOSE_DATA_IDX]
+        ext_px = self.raw_data[stk_mask, ext_idx, get_config().ADJ_CLOSE_DATA_IDX]
+        not_tradeable_mask = ~(self.tradable_mask[stk_mask, ext_idx])
+        if np.sum(not_tradeable_mask) != 0:
+            stk_idxs = np.nonzero(stk_mask)[0]
+            not_tradeable_stk_idxs = stk_idxs[not_tradeable_mask]
+            # stks = self.tickers[stk_mask]
+            # not_tradeable_stks = stks[not_tradeable_mask]
+            fill_idxs = np.nonzero(not_tradeable_mask)[0]
+            for i in range(not_tradeable_stk_idxs.shape[0]):
+                stk_idx = not_tradeable_stk_idxs[i]
+                idx_to_fill = fill_idxs[i]
+                stk_tradeable_mask = self.tradable_mask[stk_idx, :]
+                stk_tradeable_day_idxs = np.nonzero(stk_tradeable_mask)[0]
+                _ext_idx = ent_idx
+                # first tradeable day after
+                after_idxs = np.nonzero(stk_tradeable_day_idxs > ext_idx)[0]
+                if after_idxs.shape[0] > 0:
+                    _ext_idx = stk_tradeable_day_idxs[after_idxs[0]]
+                else:
+                    before_idxs = np.where(stk_tradeable_day_idxs > ent_idx)[0]
+                    if before_idxs.shape[0] > 0:
+                        _ext_idx = stk_tradeable_day_idxs[before_idxs[0]]
+                # print("%s %s %d" % (ent.strftime('%Y-%m-%d'), not_tradeable_stks[i], _ext_idx - ent_idx))
+                _ext_px = self.raw_data[stk_idx, _ext_idx, get_config().ADJ_CLOSE_DATA_IDX]
+                ext_px[idx_to_fill] = _ext_px
+
         return (ext_px - ent_px) / ent_px
 
     def find_trading_date(self, candidate_date):
@@ -144,10 +182,6 @@ class SnpEnv(object):
                 return self._idx_to_date(candidate_date_idx)
             candidate_date_idx += 1
         return None
-
-    def trading_day_generator(self):
-        for idx in np.nonzero(self.trading_day_mask)[0]:
-            yield self._idx_to_date(idx)
 
     def trading_schedule_generator(self, BEG, END, TRADING_PERIOD_DAYS):
         ent_candidate = BEG
