@@ -87,6 +87,42 @@ class Env(object):
     def _idx_to_ticker(self, idx):
         return self.tickers[idx]
 
+    def get_input(self, BEGIN, END):
+        beg_idx = self._date_to_idx(BEGIN)
+        end_idx = self._date_to_idx(END)
+        trading_day_mask = self.trading_day_mask[beg_idx:end_idx]
+        x = self.x[:, beg_idx:end_idx, :]
+        input = x[:, trading_day_mask, :]
+        return input
+
+    def get_raw_dates(self, BEGIN, END):
+        beg_idx = self._date_to_idx(BEGIN)
+        end_idx = self._date_to_idx(END)
+        trading_day_mask = self.trading_day_mask[beg_idx:end_idx]
+        raw_dt = self.raw_dt[beg_idx:end_idx]
+        return raw_dt[trading_day_mask]
+
+    def get_px(self, BEGIN, END, delay_days=0):
+        beg_idx = self._date_to_idx(BEGIN)
+        end_idx = self._date_to_idx(END)
+
+        _max_idx = self.raw_dt.shape[0]
+
+        def shift_date_idx_by_n_trading_days(date_idx, n):
+            _date_idx = date_idx
+            found = 0
+            while found < n and _date_idx < _max_idx:
+                if self.trading_day_mask[_date_idx] == True:
+                    found += 1
+            return _date_idx
+
+        beg_idx = shift_date_idx_by_n_trading_days(beg_idx, delay_days)
+        end_idx = shift_date_idx_by_n_trading_days(end_idx, delay_days)
+
+        trading_day_mask = self.trading_day_mask[beg_idx:end_idx]
+        raw_data = self.raw_data[:, beg_idx:end_idx, :]
+        return raw_data[:, trading_day_mask, get_config().ADJ_CLOSE_DATA_IDX]
+
     def get_input_generator(self, BEGIN, END, SEQ_LEN, PRED_HORIZON):
         x = self.x[:, self.trading_day_mask, :]
         raw_dt = self.raw_dt[self.trading_day_mask]
@@ -117,4 +153,7 @@ class Env(object):
             ent_px = raw_data[:, b_i: e_i, get_config().ADJ_CLOSE_DATA_IDX]
             ext_px = raw_data[:, b_i + PRED_HORIZON: e_i + PRED_HORIZON, get_config().ADJ_CLOSE_DATA_IDX]
             labels = (ext_px - ent_px) / ent_px
-            yield (input, labels.reshape(1,-1,1))
+            one_day_px = raw_data[:, b_i + 1: e_i + 1, get_config().ADJ_CLOSE_DATA_IDX]
+            daily_rets = (one_day_px - ent_px) / ent_px
+            dt = raw_dt[b_i: e_i]
+            yield (dt, ent_px, daily_rets, input, labels.reshape(1, -1, 1))

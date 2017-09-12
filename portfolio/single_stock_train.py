@@ -4,10 +4,15 @@ import os.path
 
 from portfolio.net_turtle import NetTurtle
 from portfolio.single_stock_config import get_config, Mode
-from portfolio.graphs import show_plots
+from portfolio.stat import print_alloc, get_draw_down, get_sharpe_ratio, get_capital, get_avg_yeat_ret
+from portfolio.graphs import plot_equity_curve, show_plots
 import progress
 
 from portfolio.single_stock_env import Env
+
+
+def flatten(l):
+    return [item for sublist in l for item in sublist]
 
 
 def train():
@@ -38,15 +43,25 @@ def train():
         else:
             epoch = 0
 
+        train_raw_dates = env.get_raw_dates(get_config().TRAIN_BEG, get_config().TRAIN_END)
+        train_input = env.get_input(get_config().TRAIN_BEG, get_config().TRAIN_END)
+        train_px = env.get_px(get_config().TRAIN_BEG, get_config().TRAIN_END)
+        train_px_t5 = env.get_px(get_config().TRAIN_BEG, get_config().TRAIN_END, delay_days=5)
+
+
+
+
         train_data = []
-        for input, labels in env.get_input_generator(get_config().TRAIN_BEG, get_config().TRAIN_END,
-                                                     get_config().BPTT_STEPS, get_config().PRED_HORIZON):
-            train_data.append((input, labels))
+        for dt, px, daily_rets, input, labels in env.get_input_generator(get_config().TRAIN_BEG, get_config().TRAIN_END,
+                                                                         get_config().BPTT_STEPS,
+                                                                         get_config().PRED_HORIZON):
+            train_data.append((dt, px, daily_rets, input, labels))
 
         test_data = []
-        for input, labels in env.get_input_generator(get_config().TEST_BEG, get_config().TEST_END,
-                                                     get_config().BPTT_STEPS, get_config().PRED_HORIZON):
-            test_data.append((input, labels))
+        for dt, px, daily_rets, input, labels in env.get_input_generator(get_config().TEST_BEG, get_config().TEST_END,
+                                                                         get_config().BPTT_STEPS,
+                                                                         get_config().PRED_HORIZON):
+            test_data.append((dt, px, daily_rets, input, labels))
         while True:
 
             print("Epoch %d" % epoch)
@@ -57,17 +72,51 @@ def train():
             passed = 0
             losses = np.zeros((dataset_size))
             state = None
-            for input, labels in train_data:
+            # test_px = []
+            # test_pred_px = []
+            # test_ret = []
+            # last_pred_px = None
+            # dts = []
+            # stk_idx = 0
+            for dt, px, daily_rets, input, labels in train_data:
                 if state is None:
                     state = net.zero_state(input.shape[0])
                 new_state, loss, predicted_returns = net.eval(state, input, labels)
                 state = new_state
                 losses[passed] = loss
+
+                # # real px process
+                # test_px.append(px[stk_idx,:])
+                # # predicted px process
+                # if last_pred_px is None:
+                #     last_pred_px = px[0,0]
+                # daily_pred_ret = predicted_returns[stk_idx,:,0] / get_config().PRED_HORIZON
+                # for idx in range(daily_pred_ret.shape[0]):
+                #     dpr = daily_pred_ret[idx]
+                #     last_pred_px += dpr * last_pred_px
+                #     test_pred_px.append(last_pred_px)
+                # # eq returns
+                # test_ret.append(daily_rets[stk_idx,:] * np.sign(predicted_returns[stk_idx,:,0]))
+                # # time
+                # dts.append(dt)
+
                 curr_progress = progress.print_progress(curr_progress, passed, dataset_size)
                 passed += 1
             progress.print_progess_end()
             train_avg_loss = np.mean(np.sqrt(losses))
             print("Train loss: %.4f%%" % (train_avg_loss * 100))
+
+            # test_px = flatten(test_px)
+            # test_ret = flatten(test_ret)
+            # dts = flatten(dts)
+            #
+            # years = (get_config().TRAIN_END - get_config().TRAIN_BEG).days / 365
+            # capital = get_capital(test_ret, False)
+            # train_dd = get_draw_down(capital, False)
+            # train_sharpe = get_sharpe_ratio(test_ret, years)
+            # train_y_avg = get_avg_yeat_ret(test_ret, years)
+            # print('Train dd: %.2f%% y_avg: %.2f%% sharpe: %.2f' % (train_dd * 100, train_y_avg * 100, train_sharpe))
+            # plot_equity_curve("Train equity curve", dts, capital)
 
             print("Eval test...")
             dataset_size = len(test_data)
@@ -75,7 +124,7 @@ def train():
             passed = 0
             losses = np.zeros((dataset_size))
             state = None
-            for input, labels in test_data:
+            for dt, px, daily_rets, input, labels in test_data:
                 if state is None:
                     state = net.zero_state(input.shape[0])
                 new_state, loss, predicted_returns = net.eval(state, input, labels)
@@ -94,7 +143,7 @@ def train():
                 curr_progress = 0
                 passed = 0
                 state = None
-                for input, labels in train_data:
+                for dt, px, daily_rets, input, labels in train_data:
                     if state is None:
                         state = net.zero_state(input.shape[0])
                     new_state, loss, predicted_returns = net.fit(state, input, labels)

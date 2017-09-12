@@ -20,9 +20,9 @@ ONLINE = False
 
 OPEN_PX_TYPE = PxType.CLOSE
 # YYYY-MM-DD
-PREDICTION_DATE = datetime.datetime.strptime('2017-09-01', '%Y-%m-%d').date()
-OPEN_POS_DATE = datetime.datetime.strptime('2017-09-01', '%Y-%m-%d').date()
-HPR_DATE = datetime.datetime.strptime('2017-09-08', '%Y-%m-%d').date()
+PREDICTION_DATE = datetime.datetime.strptime('2017-09-08', '%Y-%m-%d').date()
+OPEN_POS_DATE = datetime.datetime.strptime('2017-09-08', '%Y-%m-%d').date()
+HPR_DATE = datetime.datetime.strptime('2017-09-11', '%Y-%m-%d').date()
 # PREDICTION_DATE = datetime.datetime.strptime('2017-08-04', '%Y-%m-%d').date()
 # OPEN_POS_DATE = datetime.datetime.strptime('2017-08-04', '%Y-%m-%d').date()
 # HPR_DATE = datetime.datetime.strptime('2017-08-04', '%Y-%m-%d').date()
