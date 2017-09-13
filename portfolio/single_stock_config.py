@@ -34,7 +34,8 @@ class Config(object):
     ADJ_CLOSE_DATA_IDX = 8
     ADJ_VOLUME_DATA_IDX = 9
 
-    LSTM_LAYERS_SIZE = [15, 15, 15]
+    #LSTM_LAYERS_SIZE = [15, 15, 15]
+    LSTM_LAYERS_SIZE = [5, 5, 5]
     FC_LAYERS_SIZE = [30]
 
     TRAIN_BEG = YR_00
@@ -46,7 +47,7 @@ class Config(object):
     MODE = Mode.TRAIN
     EPOCH_WEIGHTS_TO_LOAD = None
 
-    BPTT_STEPS = 100
+    BPTT_STEPS = 20
     PRED_HORIZON = 5
 
     WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/%s' % TICKER
@@ -57,6 +58,7 @@ class Config(object):
     DATA_PATH = '%s/%s.csv' % (DATA_FOLDER_PATH, TICKER)
     DATA_NPZ_PATH = '%s/%s.npz' % (DATA_FOLDER_PATH, TICKER)
 
+    RESET_PRED_PX_EACH_N_DAYS = 200
 
 _config = Config()
 

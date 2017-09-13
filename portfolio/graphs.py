@@ -19,6 +19,19 @@ def hide_time_labels(ax):
     plt.setp(ax.get_xticklabels(), visible=False)
 
 
+def create_time_serie_fig(caption):
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    draw_grid(ax)
+    format_time_labels(ax, fmt=DDMMMYY_FMT)
+    ax.set_title(caption)
+    return ax
+
+
+def plot_time_serie(ax, dt, values, color='b'):
+    ax.plot_date(dt, values, fmt='-', color=color)
+
+
 def plot_equity_curve(caption, dt, capital):
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)

@@ -7,8 +7,8 @@ import numpy as np
 class NetTurtle(object):
     def __init__(self):
         print('creating neural network...')
-        self.labels = labels = tf.placeholder(tf.float32, [None, None, 1], name='labels')
-        self.input = input = tf.placeholder(tf.float32, [None, None, 5], name='input')
+        self.labels = labels = tf.placeholder(tf.float32, [None, None], name='labels')
+        self.input = input = tf.placeholder(tf.float32, [None, None, 6], name='input')
 
         cells = []
         with tf.name_scope('rnn'):
@@ -37,7 +37,7 @@ class NetTurtle(object):
             self.returns = tf.contrib.layers.fully_connected(output, 1, activation_fn=None, scope='dense_%d' % idx)
 
         with tf.name_scope('loss'):
-            diff = self.returns - labels
+            diff = self.returns - tf.expand_dims(labels, 2)
             self.cost = tf.reduce_mean(tf.square(diff))
             self.optimizer = tf.train.AdamOptimizer().minimize(self.cost)
 
@@ -81,7 +81,7 @@ class NetTurtle(object):
 
     def save_weights(self, path, epoch):
         print('saving weights after %d epoch' % epoch)
-        self.saver.save(self.sess, path, global_step=epoch)
+        self.saver.save(self.sess, path, global_step=epoch, write_meta_graph=False)
 
     def load_weights(self, path, epoch):
         print('loading %d epoch weights' % epoch)
