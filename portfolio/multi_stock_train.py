@@ -3,13 +3,13 @@ import csv
 import os.path
 
 from portfolio.net_turtle import NetTurtle
-from portfolio.single_stock_config import get_config, Mode
+from portfolio.multi_stock_config import get_config, Mode
 from portfolio.stat import print_alloc, get_draw_down, get_sharpe_ratio, get_capital, get_avg_yeat_ret
 from portfolio.graphs import plot_equity_curve, show_plots, create_time_serie_fig, plot_time_serie
 import progress
 import matplotlib.pyplot as plt
 
-from portfolio.single_stock_env import Env, date_from_timestamp
+from portfolio.multi_stock_env import Env, date_from_timestamp
 
 if get_config().MODE == Mode.TRAIN:
     plt.ioff()
@@ -55,10 +55,10 @@ def plot_prediction(name, dt, px, pred_px_series, pred_dt_series):
 
 def plot_eq(name, BEG, END, eq_rets, dt):
     years = (END - BEG).days / 365
-    capital = get_capital(eq_rets[0, :], False)
+    capital = get_capital(eq_rets[:], False)
     dd = get_draw_down(capital, False)
-    sharpe = get_sharpe_ratio(eq_rets[0, :], years)
-    y_avg = get_avg_yeat_ret(eq_rets[0, :], years)
+    sharpe = get_sharpe_ratio(eq_rets[:], years)
+    y_avg = get_avg_yeat_ret(eq_rets[:], years)
     print('%s dd: %.2f%% y_avg: %.2f%% sharpe: %.2f' % (name, dd * 100, y_avg * 100, sharpe))
     return plot_equity_curve("%s equity curve" % name, dt, capital[:-1])
 
@@ -81,12 +81,7 @@ def train():
                     'test loss',
                 ))
 
-    tickers_to_plot = [get_config().TICKER]
-    total = len(tickers_to_plot)
-    ticker_to_plot_idxs = np.zeros((total), dtype=np.int32)
-
-    for i in range(total):
-        ticker_to_plot_idxs[i] = env._ticker_to_idx(tickers_to_plot[i])
+    total_tickers = len(env.tickers)
 
     def open_train_stat_file():
         return open(get_config().TRAIN_STAT_PATH, 'a', newline='')
@@ -138,8 +133,8 @@ def train():
             tst_pred_px_series = []
             tst_pred_dt_series = []
 
-            tr_eq_rets = np.zeros((total, tr_ds_sz))
-            tst_eq_rets = np.zeros((total, tst_ds_sz))
+            tr_eq_rets = np.zeros((total_tickers, tr_ds_sz))
+            tst_eq_rets = np.zeros((total_tickers, tst_ds_sz))
 
         def get_batch_input_and_lables(input, labels, b):
             b_i = b * get_config().BPTT_STEPS
@@ -156,32 +151,32 @@ def train():
                 if serie_idx == 0:
                     # finish old serie is exists
                     if pred_px is not None:
-                        pred_px[ticker_to_plot_idxs, get_config().RESET_PRED_PX_EACH_N_DAYS] = curr_pred_px
+                        pred_px[:, get_config().RESET_PRED_PX_EACH_N_DAYS] = curr_pred_px
                         pred_dt[get_config().RESET_PRED_PX_EACH_N_DAYS] = date_from_timestamp(
                             raw_dates[data_idx])
 
                         pred_px_series.append(pred_px)
                         pred_dt_series.append(pred_dt)
                     # reset price
-                    curr_pred_px = px[ticker_to_plot_idxs, data_idx]
+                    curr_pred_px = px[:, data_idx]
                     # create new serie
-                    pred_px = np.zeros((total, get_config().RESET_PRED_PX_EACH_N_DAYS + 1))
+                    pred_px = np.zeros((total_tickers, get_config().RESET_PRED_PX_EACH_N_DAYS + 1))
                     pred_dt = [None] * (get_config().RESET_PRED_PX_EACH_N_DAYS + 1)
 
                 # fill values
-                pred_px[ticker_to_plot_idxs, serie_idx] = curr_pred_px
+                pred_px[:, serie_idx] = curr_pred_px
                 pred_dt[serie_idx] = date_from_timestamp(raw_dates[data_idx])
 
                 # update pred px
-                curr_pred_px += (predictions[ticker_to_plot_idxs, i, 0] / get_config().PRED_HORIZON) * curr_pred_px
+                curr_pred_px += (predictions[:, i, 0] / get_config().PRED_HORIZON) * curr_pred_px
 
             return curr_pred_px, pred_px, pred_dt
 
         def fill_eq_params(b, eq_rets, rets):
             s_i = b * get_config().BPTT_STEPS
             e_i = (b + 1) * get_config().BPTT_STEPS
-            eq_rets[ticker_to_plot_idxs, s_i: e_i] = (
-                rets[ticker_to_plot_idxs, s_i: e_i] * np.sign(predictions[ticker_to_plot_idxs, :, 0]))
+            eq_rets[:, s_i: e_i] = (
+                rets[:, s_i: e_i] * np.sign(predictions[:, :, 0]))
 
         while True:
 
@@ -273,13 +268,13 @@ def train():
 
                 if get_config().SAVE_EQ:
                     dt = build_time_axis(tr_raw_dates)
-                    fig = plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, tr_eq_rets, dt)
+                    mean_tr_eq_rets = np.mean(tr_eq_rets, axis=0)
+                    fig = plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, mean_tr_eq_rets, dt)
                     fig.savefig('%s/%04d.png' % (get_config().TRAIN_FIG_PATH, epoch))
-                    plt.close(fig)
                     dt = build_time_axis(tst_raw_dates)
-                    fig = plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, tst_eq_rets, dt)
+                    mean_tst_eq_rets = np.mean(tst_eq_rets, axis=0)
+                    fig = plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, mean_tst_eq_rets, dt)
                     fig.savefig('%s/%04d.png' % (get_config().TEST_FIG_PATH, epoch))
-                    plt.close(fig)
 
                 epoch += 1
             else:

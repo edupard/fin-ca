@@ -16,7 +16,7 @@ TODAY = datetime.datetime.strptime('2017-08-27', '%Y-%m-%d').date()
 
 
 class Config(object):
-    TICKER = 'MSFT'
+    TICKER = 'BAC'
 
     HIST_BEG = YR_90
     HIST_END = TODAY
@@ -50,20 +50,23 @@ class Config(object):
     BPTT_STEPS = 20
     PRED_HORIZON = 5
 
-    WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/%s' % TICKER
+    WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/embeddings'
     TRAIN_STAT_PATH = '%s/train_stat.csv' % WEIGHTS_FOLDER_PATH
     WEIGHTS_PATH = '%s/weights' % WEIGHTS_FOLDER_PATH
 
-    DATA_FOLDER_PATH = 'data/stocks/%s' % TICKER
-    DATA_PATH = '%s/%s.csv' % (DATA_FOLDER_PATH, TICKER)
-    DATA_NPZ_PATH = '%s/%s.npz' % (DATA_FOLDER_PATH, TICKER)
+    DATA_FOLDER_PATH = 'data/snp'
+    DATA_PATH = '%s/snp_px.csv' % DATA_FOLDER_PATH
+    DATA_NPZ_PATH = '%s/snp_px.npz' % DATA_FOLDER_PATH
 
-    TRAIN_FIG_PATH = 'data/stocks/%s/eq/train' % TICKER
-    TEST_FIG_PATH = 'data/stocks/%s/eq/test' % TICKER
+    MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 30
+
+    TRAIN_FIG_PATH = 'data/stocks/embeddings/eq/train'
+    TEST_FIG_PATH = 'data/stocks/embeddings/eq/test'
 
     SAVE_EQ = True
 
     RESET_PRED_PX_EACH_N_DAYS = 200
+
 
 _config = Config()
 

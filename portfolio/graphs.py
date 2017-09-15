@@ -39,6 +39,7 @@ def plot_equity_curve(caption, dt, capital):
     format_time_labels(ax, fmt=DDMMMYY_FMT)
     ax.set_title(caption)
     ax.plot_date(dt, capital, color='b', fmt='-')
+    return fig
 
 def show_plots():
     plt.show(True)
