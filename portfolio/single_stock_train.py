@@ -53,6 +53,16 @@ def plot_prediction(name, dt, px, pred_px_series, pred_dt_series):
         plot_time_serie(ax, pred_dt, pred_px, color='r')
 
 
+def plot_eq_v1(name, BEG, END, dt, capital):
+    years = (END - BEG).days / 365
+    dd = get_draw_down(capital[0], False)
+    rets = capital[0, 1:] - capital[0, :-1]
+    sharpe = get_sharpe_ratio(rets, years)
+    y_avg = (capital[0, -1] - capital[0, 0]) / years
+    print('%s dd: %.2f%% y_avg: %.2f%% sharpe: %.2f' % (name, dd * 100, y_avg * 100, sharpe))
+    return plot_equity_curve("%s equity curve!" % name, dt, capital[0, :])
+
+
 def plot_eq(name, BEG, END, eq_rets, dt):
     years = (END - BEG).days / 365
     capital = get_capital(eq_rets[0, :], False)
@@ -140,6 +150,8 @@ def train():
 
             tr_eq_rets = np.zeros((total, tr_ds_sz))
             tst_eq_rets = np.zeros((total, tst_ds_sz))
+            tr_eq = np.zeros((total, tr_ds_sz))
+            tst_eq = np.zeros((total, tst_ds_sz))
 
         def get_batch_input_and_lables(input, labels, b):
             b_i = b * get_config().BPTT_STEPS
@@ -183,7 +195,30 @@ def train():
             eq_rets[ticker_to_plot_idxs, s_i: e_i] = (
                 rets[ticker_to_plot_idxs, s_i: e_i] * np.sign(predictions[ticker_to_plot_idxs, :, 0]))
 
-        while True:
+        def fill_eq(eq, rets):
+            nonlocal capital, bet, position
+            if capital is None:
+                capital = np.ones(total, dtype=np.float32)
+            if bet is None:
+                bet = np.zeros(total, dtype=np.float32)
+            if position is None:
+                position = 0
+
+
+            for i in range(predictions.shape[1]):
+                data_idx = b * get_config().BPTT_STEPS + i
+
+                if data_idx % get_config().REBALANCE_FREQ == 0:
+                    position = np.sign(predictions[ticker_to_plot_idxs, i, 0])
+                    capital += bet
+                    bet = np.ones(total)
+                    capital -= bet
+                eq[ticker_to_plot_idxs, data_idx] = (capital + bet)
+
+
+                bet += bet * rets[ticker_to_plot_idxs, data_idx] * position
+
+        while epoch <= get_config().MAX_EPOCH:
 
             print("Epoch %d" % epoch)
 
@@ -195,6 +230,11 @@ def train():
             pred_px = None
             pred_dt = None
 
+            # capital = np.ones(total, dtype=np.float32)
+            # bet = np.zeros(total, dtype=np.float32)
+            capital = None
+            bet = None
+            position = None
             for b in range(tr_batch_num):
                 if state is None:
                     state = net.zero_state(len(env.tickers))
@@ -207,6 +247,7 @@ def train():
                                                                           pred_dt, tr_pred_px_series,
                                                                           tr_pred_dt_series, curr_pred_px)
                     fill_eq_params(b, tr_eq_rets, tr_rets)
+                    fill_eq(tr_eq, tr_rets)
 
                 losses[b] = loss
                 curr_progress = progress.print_progress(curr_progress, b, tr_batch_num)
@@ -223,6 +264,9 @@ def train():
             pred_px = None
             pred_dt = None
 
+            capital = None
+            bet = None
+            position = None
             for b in range(tst_batch_num):
                 if state is None:
                     state = net.zero_state(len(env.tickers))
@@ -235,7 +279,9 @@ def train():
                                                                           pred_px, pred_dt,
                                                                           tst_pred_px_series,
                                                                           tst_pred_dt_series, curr_pred_px)
+
                     fill_eq_params(b, tst_eq_rets, tst_rets)
+                    fill_eq(tst_eq, tst_rets)
 
                 losses[b] = loss
                 curr_progress = progress.print_progress(curr_progress, b, tst_batch_num)
@@ -285,11 +331,14 @@ def train():
             else:
 
                 dt = build_time_axis(tr_raw_dates)
+
                 # plot_prediction('Train', dt, tr_px, tr_pred_px_series, tr_pred_dt_series)
+                plot_eq_v1('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, dt, tr_eq)
                 plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, tr_eq_rets, dt)
 
                 dt = build_time_axis(tst_raw_dates)
                 # plot_prediction('Test', dt, tst_px, tst_pred_px_series, tst_pred_dt_series)
+                plot_eq_v1('Test', get_config().TEST_BEG, get_config().TEST_END, dt, tst_eq)
                 plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, tst_eq_rets, dt)
 
                 show_plots()

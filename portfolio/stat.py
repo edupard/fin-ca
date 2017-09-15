@@ -31,7 +31,6 @@ def get_draw_down(c, recap):
 
     return np.min(dd_a)
 
-
 def get_sharpe_ratio(ret, years):
     return math.sqrt(ret.shape[0] / years) * np.mean(ret) / np.std(ret)
 
