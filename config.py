@@ -41,7 +41,7 @@ class Config(object):
 
     ENT_ON_MON = True
     ENT_MON_OPEN = False
-    EXIT_ON_MON = False
+    EXIT_ON_MON = True
     EXIT_ON_MON_OPEN = False
 
     SLCT_PCT = 100

@@ -2,7 +2,7 @@ import numpy as np
 import csv
 import os.path
 
-from portfolio.net_turtle import NetTurtle
+from portfolio.net_shiva import NetShiva
 from portfolio.multi_stock_config import get_config, Mode
 from portfolio.stat import print_alloc, get_draw_down, get_sharpe_ratio, get_capital, get_avg_yeat_ret
 from portfolio.graphs import plot_equity_curve, show_plots, create_time_serie_fig, plot_time_serie
@@ -68,7 +68,7 @@ def train():
         os.makedirs(get_config().WEIGHTS_FOLDER_PATH)
 
     env = Env()
-    net = NetTurtle()
+    net = NetShiva()
     net.init()
 
     if not os.path.exists(get_config().TRAIN_STAT_PATH):
@@ -271,10 +271,12 @@ def train():
                     mean_tr_eq_rets = np.mean(tr_eq_rets, axis=0)
                     fig = plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, mean_tr_eq_rets, dt)
                     fig.savefig('%s/%04d.png' % (get_config().TRAIN_FIG_PATH, epoch))
+                    plt.close(fig)
                     dt = build_time_axis(tst_raw_dates)
                     mean_tst_eq_rets = np.mean(tst_eq_rets, axis=0)
                     fig = plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, mean_tst_eq_rets, dt)
                     fig.savefig('%s/%04d.png' % (get_config().TEST_FIG_PATH, epoch))
+                    plt.close(fig)
 
                 epoch += 1
             else:

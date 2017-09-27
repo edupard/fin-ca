@@ -10,8 +10,10 @@ class NetVersion(Enum):
     BANANA = 1
     WORM = 2
     SNAKE = 3
-    CAT = 4
-    COW = 5
+    ANTI_SNAKE = 4
+    CAT = 5
+    COW = 6
+
 
 class Mode(Enum):
     TRAIN = 0
@@ -20,6 +22,7 @@ class Mode(Enum):
 YR_90 = datetime.datetime.strptime('1990-01-01', '%Y-%m-%d').date()
 YR_00 = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
 YR_07 = datetime.datetime.strptime('2007-01-01', '%Y-%m-%d').date()
+YR_09 = datetime.datetime.strptime('2009-01-01', '%Y-%m-%d').date()
 YR_10 = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
 YR_15 = datetime.datetime.strptime('2015-01-01', '%Y-%m-%d').date()
 
@@ -60,12 +63,12 @@ class Config(object):
 
     SHUFFLE = True
 
-    TEST_BEG = YR_07
+    TEST_BEG = TRAIN_END
     TEST_END = HIST_END
 
     MIN_PARTITION_Z = 1e-6
 
-    NET_VER = NetVersion.COW
+    NET_VER = NetVersion.APPLE
     TRAIN_STAT_PATH = 'nets/portfolio/%s/train_stat.csv' % NET_VER.name
     WEIGHTS_PATH = 'nets/portfolio/%s/weights' % NET_VER.name
 
@@ -73,8 +76,13 @@ class Config(object):
 
     BATCH_NORM = True
 
-    MODE = Mode.TRAIN
-    EPOCH_WEIGHTS_TO_LOAD = None
+    MODE = Mode.TEST
+    EPOCH_WEIGHTS_TO_LOAD = 172
+    # EPOCH_WEIGHTS_TO_LOAD = 81
+    # EPOCH_WEIGHTS_TO_LOAD = 145
+
+    # ANTI_SNAKE = 151
+    # SNAKE = 135
 
     COVARIANCE_LENGTH = 20
 
@@ -83,6 +91,8 @@ class Config(object):
 
     # LEARNING_RATE = 0.001
     LEARNING_RATE = 0.0001
+
+    SELECTTION = 23
 
 
 _config = Config()

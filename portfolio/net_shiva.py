@@ -4,7 +4,7 @@ from portfolio.config import get_config
 import numpy as np
 
 
-class NetTurtle(object):
+class NetShiva(object):
     def __init__(self):
         print('creating neural network...')
         self.labels = labels = tf.placeholder(tf.float32, [None, None], name='labels')
@@ -16,7 +16,9 @@ class NetTurtle(object):
             for num_units in get_config().LSTM_LAYERS_SIZE:
                 scope_name = 'rnn_layer_%d' % idx
                 with tf.name_scope(scope_name):
-                    rnn_cell = tf.contrib.rnn.LayerNormBasicLSTMCell(num_units)
+                    rnn_cell = tf.contrib.rnn.LSTMCell(num_units)
+                    # rnn_cell = tf.contrib.rnn.GRUCell(num_units)
+                    # rnn_cell = tf.contrib.rnn.LayerNormBasicLSTMCell(num_units)
                     cells.append(rnn_cell)
                 idx += 1
             self.rnn_cell = rnn_cell = tf.contrib.rnn.MultiRNNCell(cells)
@@ -39,7 +41,11 @@ class NetTurtle(object):
         with tf.name_scope('loss'):
             diff = self.returns - tf.expand_dims(labels, 2)
             self.cost = tf.reduce_mean(tf.square(diff))
-            self.optimizer = tf.train.AdamOptimizer().minimize(self.cost)
+            self.optimizer = tf.train.AdamOptimizer()
+            # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
+            self.vars = tf.trainable_variables()
+            self.grads_and_vars = self.optimizer.compute_gradients(self.cost, var_list=self.vars)
+            self.train = self.optimizer.apply_gradients(self.grads_and_vars)
 
         self.sess = tf.Session()
         self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=None)
@@ -74,7 +80,8 @@ class NetTurtle(object):
     def fit(self, state, input, labels):
         feed_dict = {self.input: input, self.labels: labels}
         self.fill_feed_dict(feed_dict, state)
-        new_state, cost, returns, _ = self.sess.run((self.new_state, self.cost, self.returns, self.optimizer), feed_dict)
+        # gv = self.sess.run((self.grads_and_vars), feed_dict)
+        new_state, cost, returns, _ = self.sess.run((self.new_state, self.cost, self.returns, self.train), feed_dict)
         return new_state, cost, returns
 
     def save_weights(self, path, epoch):

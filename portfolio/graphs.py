@@ -41,5 +41,16 @@ def plot_equity_curve(caption, dt, capital):
     ax.plot_date(dt, capital, color='b', fmt='-')
     return fig
 
+def plot_two_equity_curves(caption, dt_1, capital_1, dt_2, capital_2):
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    draw_grid(ax)
+    format_time_labels(ax, fmt=DDMMMYY_FMT)
+    ax.set_title(caption)
+    ax.plot_date(dt_1, capital_1, color='b', fmt='-')
+    ax.plot_date(dt_2, capital_2, color='r', fmt='-')
+    return fig
+
+
 def show_plots():
     plt.show(True)

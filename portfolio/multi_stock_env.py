@@ -13,6 +13,7 @@ class Env(object):
     def __init__(self):
         print('loading data...')
         tickers, raw_dt, raw_data = load_npz_data(get_config().DATA_NPZ_PATH)
+        # tickers, raw_dt, raw_data = load_npz_data('data/stocks/DIS/DIS.npz')
         print('data load complete')
 
         self._tickers = tickers
@@ -22,6 +23,7 @@ class Env(object):
         tradable_mask = np.all(raw_data > 0.0, axis=2)
         traded_stocks_per_day = tradable_mask[:, :].sum(0)
         trading_day_mask = traded_stocks_per_day > get_config().MIN_STOCKS_TRADABLE_PER_TRADING_DAY
+        # trading_day_mask = traded_stocks_per_day > 0
 
         self.trading_days = np.sum(trading_day_mask)
 

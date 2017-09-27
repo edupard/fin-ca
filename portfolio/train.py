@@ -13,6 +13,7 @@ from portfolio.net_apple import NetApple
 from portfolio.net_banana import NetBanana
 from portfolio.net_worm import NetWorm
 from portfolio.net_snake import NetSnake
+from portfolio.net_anti_snake import NetAntiSnake
 from portfolio.net_cat import NetCat
 from portfolio.net_cow import NetCow
 import progress
@@ -55,6 +56,8 @@ def train():
         net = NetWorm()
     elif get_config().NET_VER == NetVersion.SNAKE:
         net = NetSnake()
+    elif get_config().NET_VER == NetVersion.ANTI_SNAKE:
+        net = NetAntiSnake()
     elif get_config().NET_VER == NetVersion.CAT:
         net = NetCat()
     elif get_config().NET_VER == NetVersion.COW:
@@ -85,7 +88,7 @@ def train():
 
     with open(get_config().TRAIN_STAT_PATH, 'a', newline='') as f:
         writer = csv.writer(f)
-        if get_config().EPOCH_WEIGHTS_TO_LOAD is not None:
+        if get_config().EPOCH_WEIGHTS_TO_LOAD != 0:
             net.load_weights(get_config().WEIGHTS_PATH, get_config().EPOCH_WEIGHTS_TO_LOAD)
             epoch = get_config().EPOCH_WEIGHTS_TO_LOAD
             if get_config().MODE == Mode.TRAIN:
@@ -143,27 +146,93 @@ def train():
                 stk_mask = snp_env.get_tradeable_snp_components_mask(ent)
                 x = snp_env.get_input(stk_mask, ent)
                 labels = snp_env.get_ret_lbl(stk_mask, ent, ext)
+
                 if get_config().NET_VER == NetVersion.COW:
                     variances = calc_variance(x)
                     pl, weights = net.eval(x, labels, variances)
                 else:
                     pl, weights = net.eval(x, labels)
+
+                if get_config().NET_VER == NetVersion.APPLE:
+                    # # net
+                    # long_mask = weights >= 0.0
+                    # short_mask = weights <= 0.0
+                    #
+                    # int_date = snp_env.find_trading_date(ent + datetime.timedelta(days=1))
+                    # int_r = snp_env.get_ret_lbl(stk_mask, ent, int_date)
+                    # port_ret = labels - int_r
+                    # # sorted_int_r_idxs = np.argsort(int_r)
+                    # long_idxs = np.nonzero(long_mask)[0]
+                    # long_int_r = int_r[long_idxs]
+                    # sorted_long_int_r_idxs = np.argsort(long_int_r)
+                    # long_sel_idxs = long_idxs[sorted_long_int_r_idxs[:get_config().SELECTTION]]
+                    #
+                    # short_idxs = np.nonzero(short_mask)[0]
+                    # short_int_r = int_r[short_idxs]
+                    # sorted_short_int_r_idxs = np.argsort(short_int_r)
+                    # short_sel_idxs = short_idxs[sorted_short_int_r_idxs[-get_config().SELECTTION:]]
+                    #
+                    # long_pl = np.mean(port_ret[long_sel_idxs])
+                    # short_pl = np.mean(port_ret[short_sel_idxs])
+
+                    # # no net
+                    # int_date = snp_env.find_trading_date(ent + datetime.timedelta(days=1))
+                    # int_r = snp_env.get_ret_lbl(stk_mask, ent, int_date)
+                    # port_ret = labels - int_r
+                    # sorted_int_r_idxs = np.argsort(int_r)
+                    # long_pl = np.mean(port_ret[sorted_int_r_idxs[:get_config().SELECTTION]])
+                    # short_pl = np.mean(port_ret[sorted_int_r_idxs[-get_config().SELECTTION:]])
+
+                    # 1d no net
+                    prev_date = snp_env.find_prev_trading_date(ent - datetime.timedelta(days=1))
+                    int_stk_mask = snp_env.get_tradeable_snp_components_mask(prev_date)
+                    stk_mask &= int_stk_mask
+
+                    int_r = snp_env.get_ret_lbl(stk_mask, prev_date, ent)
+                    port_ret = snp_env.get_ret_lbl(stk_mask, ent, ext)
+                    sorted_int_r_idxs = np.argsort(int_r)
+                    long_pl = np.mean(port_ret[sorted_int_r_idxs[:get_config().SELECTTION]])
+                    short_pl = np.mean(port_ret[sorted_int_r_idxs[-get_config().SELECTTION:]])
+
+                    # real_ext = snp_env.find_trading_date(ext + datetime.timedelta(days=1))
+                    # if real_ext is None:
+                    #     real_ext = ext
+                    # int_r = labels
+                    # port_ret = snp_env.get_ret_lbl(stk_mask, ext, real_ext)
+                    # sorted_int_r_idxs = np.argsort(int_r)
+                    # long_pl = np.mean(port_ret[sorted_int_r_idxs[:get_config().SELECTTION]])
+                    # short_pl = np.mean(port_ret[sorted_int_r_idxs[-get_config().SELECTTION:]])
+
+                    pl = 0.7 * long_pl - 0.3 * short_pl
+
+
+                # if get_config().NET_VER == NetVersion.SNAKE or get_config().NET_VER == NetVersion.ANTI_SNAKE:
+                #     sorted_weights_idxs = np.argsort(weights)
+                #     selected_weights_idxs = sorted_weights_idxs[-get_config().SELECTTION:]
+                #     pl = np.mean(labels[selected_weights_idxs])
+                #     if get_config().NET_VER == NetVersion.ANTI_SNAKE:
+                #         pl = -pl
+
                 if get_config().PRINT_PREDICTION:
                     print_alloc(pl, ent, snp_env.tickers, stk_mask, weights)
+                if abs(pl) >= 0.3:
+                    pl = 0
                 ret[passed] = pl
                 curr_progress = progress.print_progress(curr_progress, passed, dataset_size)
                 passed += 1
             progress.print_progess_end()
 
-            print("Train loss: %.4f" % (np.mean(np.sqrt(ret)) * 100))
-
-            # years = (get_config().TRAIN_END - get_config().TRAIN_BEG).days / 365
-            # capital = get_capital(ret, False)
-            # train_dd = get_draw_down(capital, False)
-            # train_sharpe = get_sharpe_ratio(ret, years)
-            # train_y_avg = get_avg_yeat_ret(ret, years)
-            # print('Train dd: %.2f%% y_avg: %.2f%% sharpe: %.2f' % (train_dd * 100, train_y_avg * 100, train_sharpe))
-            # plot_equity_curve("Train equity curve", dt, capital)
+            # print("Train loss: %.4f" % (np.mean(np.sqrt(ret)) * 100))
+            years = (get_config().TRAIN_END - get_config().TRAIN_BEG).days / 365
+            capital = get_capital(ret, False)
+            train_dd = get_draw_down(capital, False)
+            train_sharpe = get_sharpe_ratio(ret, years)
+            train_y_avg = get_avg_yeat_ret(ret, years)
+            print('Train dd: %.2f%% y_avg: %.2f%% sharpe: %.2f' % (train_dd * 100, train_y_avg * 100, train_sharpe))
+            if get_config().MODE == Mode.TEST:
+                plot_equity_curve("Train equity curve", dt, capital)
+                df = pd.DataFrame({'date': dt, 'capital': capital})
+                df.to_csv('data/tr_eq.csv', index=False)
 
             # eval test
             print("Eval test...")
@@ -174,7 +243,7 @@ def train():
             passed = 0
             dt = []
             for ent, ext in test_trading_schedule:
-                if ext.month == 8 and ext.day == 27 and ext.year == 2017:
+                if ext.month == 3 and ext.day == 11 and ext.year == 2015:
                     _debug = 0
                 if ext is None:
                     break
@@ -189,34 +258,93 @@ def train():
                     pl, weights = net.eval(x, labels, variances)
                 else:
                     pl, weights = net.eval(x, labels)
+
+                if get_config().NET_VER == NetVersion.APPLE:
+                    # # net
+                    # long_mask = weights >= 0.0
+                    # short_mask = weights <= 0.0
+                    #
+                    # int_date = snp_env.find_trading_date(ent + datetime.timedelta(days=1))
+                    # int_r = snp_env.get_ret_lbl(stk_mask, ent, int_date)
+                    # port_ret = labels - int_r
+                    # # sorted_int_r_idxs = np.argsort(int_r)
+                    # long_idxs = np.nonzero(long_mask)[0]
+                    # long_int_r = int_r[long_idxs]
+                    # sorted_long_int_r_idxs = np.argsort(long_int_r)
+                    # long_sel_idxs = long_idxs[sorted_long_int_r_idxs[:get_config().SELECTTION]]
+                    #
+                    # short_idxs = np.nonzero(short_mask)[0]
+                    # short_int_r = int_r[short_idxs]
+                    # sorted_short_int_r_idxs = np.argsort(short_int_r)
+                    # short_sel_idxs =  short_idxs[sorted_short_int_r_idxs[-get_config().SELECTTION:]]
+                    #
+                    # long_pl = np.mean(port_ret[long_sel_idxs])
+                    # short_pl = np.mean(port_ret[short_sel_idxs])
+
+                    # # no net
+                    # int_date = snp_env.find_trading_date(ent + datetime.timedelta(days=1))
+                    # int_r = snp_env.get_ret_lbl(stk_mask, ent, int_date)
+                    # port_ret = labels - int_r
+                    # sorted_int_r_idxs = np.argsort(int_r)
+                    # long_pl = np.mean(port_ret[sorted_int_r_idxs[:get_config().SELECTTION]])
+                    # short_pl = np.mean(port_ret[sorted_int_r_idxs[-get_config().SELECTTION:]])
+
+                    # 1d no net
+                    prev_date = snp_env.find_prev_trading_date(ent - datetime.timedelta(days=1))
+                    int_stk_mask = snp_env.get_tradeable_snp_components_mask(prev_date)
+                    stk_mask &= int_stk_mask
+
+                    int_r = snp_env.get_ret_lbl(stk_mask, prev_date, ent)
+                    port_ret = snp_env.get_ret_lbl(stk_mask, ent, ext)
+                    sorted_int_r_idxs = np.argsort(int_r)
+                    long_pl = np.mean(port_ret[sorted_int_r_idxs[:get_config().SELECTTION]])
+                    short_pl = np.mean(port_ret[sorted_int_r_idxs[-get_config().SELECTTION:]])
+
+                    pl = 0.7 * long_pl - 0.3 * short_pl
+
+                # if get_config().NET_VER == NetVersion.SNAKE or get_config().NET_VER == NetVersion.ANTI_SNAKE:
+                #     sorted_weights_idxs = np.argsort(weights)
+                #     selected_weights_idxs = sorted_weights_idxs[-get_config().SELECTTION:]
+                #     pl = np.mean(labels[selected_weights_idxs])
+                #     if get_config().NET_VER == NetVersion.ANTI_SNAKE:
+                #         pl = -pl
+
                 if get_config().PRINT_PREDICTION:
                     print_alloc(pl, ent, snp_env.tickers, stk_mask, weights)
+                if abs(pl) >= 0.3:
+                    pl = 0
                 ret[passed] = pl
                 curr_progress = progress.print_progress(curr_progress, passed, dataset_size)
                 passed += 1
             progress.print_progess_end()
 
-            print("Test loss: %.4f" % (np.mean(np.sqrt(ret)) * 100))
-            # years = (get_config().TRAIN_END - get_config().TRAIN_BEG).days / 365
-            # capital = get_capital(ret, False)
-            # test_dd = get_draw_down(capital, False)
-            # test_sharpe = get_sharpe_ratio(ret, years)
-            # test_y_avg = get_avg_yeat_ret(ret, years)
-            # print('Test dd: %.2f%% y_avg: %.2f%% sharpe: %.2f' % (test_dd * 100, test_y_avg * 100, test_sharpe))
-            # plot_equity_curve("Test equity curve", dt, capital)
+            # print("Test loss: %.4f" % (np.mean(np.sqrt(ret)) * 100))
+
+            years = (get_config().TRAIN_END - get_config().TRAIN_BEG).days / 365
+            capital = get_capital(ret, False)
+            test_dd = get_draw_down(capital, False)
+            test_sharpe = get_sharpe_ratio(ret, years)
+            test_y_avg = get_avg_yeat_ret(ret, years)
+            print('Test dd: %.2f%% y_avg: %.2f%% sharpe: %.2f' % (test_dd * 100, test_y_avg * 100, test_sharpe))
+
+            if get_config().MODE == Mode.TEST:
+                plot_equity_curve("Test equity curve", dt, capital)
+                df = pd.DataFrame({'date': dt, 'capital': capital})
+                df.to_csv('data/tst_eq.csv', index=False)
+
 
             if get_config().MODE == Mode.TRAIN:
                 net.save_weights(get_config().WEIGHTS_PATH, epoch)
-                # writer.writerow(
-                #     (
-                #         epoch,
-                #         train_dd,
-                #         train_y_avg,
-                #         train_sharpe,
-                #         test_dd,
-                #         test_y_avg,
-                #         test_sharpe
-                #     ))
+                writer.writerow(
+                    (
+                        epoch,
+                        train_dd,
+                        train_y_avg,
+                        train_sharpe,
+                        test_dd,
+                        test_y_avg,
+                        test_sharpe
+                    ))
                 epoch += 1
                 f.flush()
             else:

@@ -10,13 +10,14 @@ class Mode(Enum):
 YR_90 = datetime.datetime.strptime('1990-01-01', '%Y-%m-%d').date()
 YR_00 = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
 YR_07 = datetime.datetime.strptime('2007-01-01', '%Y-%m-%d').date()
+YR_09 = datetime.datetime.strptime('2009-01-01', '%Y-%m-%d').date()
 YR_10 = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
 YR_15 = datetime.datetime.strptime('2015-01-01', '%Y-%m-%d').date()
 TODAY = datetime.datetime.strptime('2017-08-27', '%Y-%m-%d').date()
 
 
 class Config(object):
-    TICKER = 'MSFT'
+    TICKER = 'BAC'
 
     HIST_BEG = YR_90
     HIST_END = TODAY
@@ -41,11 +42,11 @@ class Config(object):
     TRAIN_BEG = YR_00
     TRAIN_END = YR_07
 
-    TEST_BEG = YR_07
+    TEST_BEG = TRAIN_END
     TEST_END = HIST_END
 
-    MODE = Mode.TEST
-    EPOCH_WEIGHTS_TO_LOAD = 410
+    MODE = Mode.TRAIN
+    EPOCH_WEIGHTS_TO_LOAD = 223
 
     BPTT_STEPS = 20
     PRED_HORIZON = 5
@@ -62,11 +63,30 @@ class Config(object):
     TRAIN_FIG_PATH = 'data/stocks/%s/eq/train' % TICKER
     TEST_FIG_PATH = 'data/stocks/%s/eq/test' % TICKER
 
-    SAVE_EQ = True
+    TRAIN_EQ_PATH = 'data/stocks/%s/eq/train/eq.csv' % TICKER
+    TEST_EQ_PATH = 'data/stocks/%s/eq/test/eq.csv' % TICKER
+
+    DRAW_PREDICTIONS = False
 
     MAX_EPOCH = 500
 
-    RESET_PRED_PX_EACH_N_DAYS = 200
+    RESET_PRED_PX_EACH_N_DAYS = 265
+
+    def reload(self):
+        self.WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/%s' % self.TICKER
+        self.TRAIN_STAT_PATH = '%s/train_stat.csv' % self.WEIGHTS_FOLDER_PATH
+        self.WEIGHTS_PATH = '%s/weights' % self.WEIGHTS_FOLDER_PATH
+
+        self.DATA_FOLDER_PATH = 'data/stocks/%s' % self.TICKER
+        self.DATA_PATH = '%s/%s.csv' % (self.DATA_FOLDER_PATH, self.TICKER)
+        self.DATA_NPZ_PATH = '%s/%s.npz' % (self.DATA_FOLDER_PATH, self.TICKER)
+
+        self.TRAIN_FIG_PATH = 'data/stocks/%s/eq/train' % self.TICKER
+        self.TEST_FIG_PATH = 'data/stocks/%s/eq/test' % self.TICKER
+
+        self.TRAIN_EQ_PATH = 'data/stocks/%s/eq/train/eq.csv' % self.TICKER
+        self.TEST_EQ_PATH = 'data/stocks/%s/eq/test/eq.csv' % self.TICKER
+
 
 _config = Config()
 

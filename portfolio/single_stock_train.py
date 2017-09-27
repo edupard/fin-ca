@@ -8,21 +8,20 @@ from portfolio.stat import print_alloc, get_draw_down, get_sharpe_ratio, get_cap
 from portfolio.graphs import plot_equity_curve, show_plots, create_time_serie_fig, plot_time_serie
 import progress
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from portfolio.single_stock_env import Env, date_from_timestamp
 
 if get_config().MODE == Mode.TRAIN:
     plt.ioff()
 
-if not os.path.exists(get_config().TRAIN_FIG_PATH):
-    os.makedirs(get_config().TRAIN_FIG_PATH)
-if not os.path.exists(get_config().TEST_FIG_PATH):
-    os.makedirs(get_config().TEST_FIG_PATH)
-
-
-def flatten(l):
-    return [item for sublist in l for item in sublist]
-
+def create_folders():
+    if not os.path.exists(get_config().WEIGHTS_FOLDER_PATH):
+        os.makedirs(get_config().WEIGHTS_FOLDER_PATH)
+    if not os.path.exists(get_config().TRAIN_FIG_PATH):
+        os.makedirs(get_config().TRAIN_FIG_PATH)
+    if not os.path.exists(get_config().TEST_FIG_PATH):
+        os.makedirs(get_config().TEST_FIG_PATH)
 
 def get_batches_num(ds_sz, bptt_steps):
     return ds_sz // bptt_steps + (0 if ds_sz % bptt_steps == 0 else 1)
@@ -53,33 +52,20 @@ def plot_prediction(name, dt, px, pred_px_series, pred_dt_series):
         plot_time_serie(ax, pred_dt, pred_px, color='r')
 
 
-def plot_eq_v1(name, BEG, END, dt, capital):
+def plot_eq(name, BEG, END, dt, capital):
     years = (END - BEG).days / 365
     dd = get_draw_down(capital[0], False)
     rets = capital[0, 1:] - capital[0, :-1]
     sharpe = get_sharpe_ratio(rets, years)
     y_avg = (capital[0, -1] - capital[0, 0]) / years
     print('%s dd: %.2f%% y_avg: %.2f%% sharpe: %.2f' % (name, dd * 100, y_avg * 100, sharpe))
-    return plot_equity_curve("%s equity curve!" % name, dt, capital[0, :])
+    return plot_equity_curve("%s equity curve" % name, dt, capital[0, :])
 
 
-def plot_eq(name, BEG, END, eq_rets, dt):
-    years = (END - BEG).days / 365
-    capital = get_capital(eq_rets[0, :], False)
-    dd = get_draw_down(capital, False)
-    sharpe = get_sharpe_ratio(eq_rets[0, :], years)
-    y_avg = get_avg_yeat_ret(eq_rets[0, :], years)
-    print('%s dd: %.2f%% y_avg: %.2f%% sharpe: %.2f' % (name, dd * 100, y_avg * 100, sharpe))
-    return plot_equity_curve("%s equity curve" % name, dt, capital[:-1])
-
-
-def train():
-    if not os.path.exists(get_config().WEIGHTS_FOLDER_PATH):
-        os.makedirs(get_config().WEIGHTS_FOLDER_PATH)
+def train(net):
+    create_folders()
 
     env = Env()
-    net = NetTurtle()
-    net.init()
 
     if not os.path.exists(get_config().TRAIN_STAT_PATH):
         with open(get_config().TRAIN_STAT_PATH, 'a', newline='') as f:
@@ -107,12 +93,13 @@ def train():
     with open_train_stat_file() if is_train() else dummy_context_mgr() as f:
         if is_train():
             writer = csv.writer(f)
-        if get_config().EPOCH_WEIGHTS_TO_LOAD is not None:
+        if get_config().EPOCH_WEIGHTS_TO_LOAD != 0:
             net.load_weights(get_config().WEIGHTS_PATH, get_config().EPOCH_WEIGHTS_TO_LOAD)
             epoch = get_config().EPOCH_WEIGHTS_TO_LOAD
             if is_train():
                 epoch += 1
         else:
+            net.init()
             epoch = 0
 
         def get_net_data(BEG, END):
@@ -142,16 +129,14 @@ def train():
             get_config().TEST_BEG,
             get_config().TEST_END)
 
-        if not is_train() or get_config().SAVE_EQ:
+        if get_config().DRAW_PREDICTIONS:
             tr_pred_px_series = []
             tr_pred_dt_series = []
             tst_pred_px_series = []
             tst_pred_dt_series = []
 
-            tr_eq_rets = np.zeros((total, tr_ds_sz))
-            tst_eq_rets = np.zeros((total, tst_ds_sz))
-            tr_eq = np.zeros((total, tr_ds_sz))
-            tst_eq = np.zeros((total, tst_ds_sz))
+        tr_eq = np.zeros((total, tr_ds_sz))
+        tst_eq = np.zeros((total, tst_ds_sz))
 
         def get_batch_input_and_lables(input, labels, b):
             b_i = b * get_config().BPTT_STEPS
@@ -189,13 +174,7 @@ def train():
 
             return curr_pred_px, pred_px, pred_dt
 
-        def fill_eq_params(b, eq_rets, rets):
-            s_i = b * get_config().BPTT_STEPS
-            e_i = (b + 1) * get_config().BPTT_STEPS
-            eq_rets[ticker_to_plot_idxs, s_i: e_i] = (
-                rets[ticker_to_plot_idxs, s_i: e_i] * np.sign(predictions[ticker_to_plot_idxs, :, 0]))
-
-        def fill_eq(eq, rets):
+        def fill_eq(eq, rets, raw_dates):
             nonlocal capital, bet, position
             if capital is None:
                 capital = np.ones(total, dtype=np.float32)
@@ -204,9 +183,12 @@ def train():
             if position is None:
                 position = 0
 
-
             for i in range(predictions.shape[1]):
                 data_idx = b * get_config().BPTT_STEPS + i
+
+                date = date_from_timestamp(raw_dates[data_idx])
+                if date.year == 2012 and date.month == 12 and date.day == 31:
+                    _debug = 0
 
                 if data_idx % get_config().REBALANCE_FREQ == 0:
                     position = np.sign(predictions[ticker_to_plot_idxs, i, 0])
@@ -215,14 +197,11 @@ def train():
                     capital -= bet
                 eq[ticker_to_plot_idxs, data_idx] = (capital + bet)
 
-
                 bet += bet * rets[ticker_to_plot_idxs, data_idx] * position
 
         while epoch <= get_config().MAX_EPOCH:
 
-            print("Epoch %d" % epoch)
-
-            print("Eval train...")
+            print("Eval %d epoch on train set..." % epoch)
             curr_progress = 0
             state = None
             losses = np.zeros((tr_batch_num))
@@ -230,8 +209,6 @@ def train():
             pred_px = None
             pred_dt = None
 
-            # capital = np.ones(total, dtype=np.float32)
-            # bet = np.zeros(total, dtype=np.float32)
             capital = None
             bet = None
             position = None
@@ -242,12 +219,11 @@ def train():
                 input, labels = get_batch_input_and_lables(tr_input, tr_labels, b)
                 state, loss, predictions = net.eval(state, input, labels)
 
-                if not is_train() or get_config().SAVE_EQ:
+                if get_config().DRAW_PREDICTIONS:
                     curr_pred_px, pred_px, pred_dt = predict_price_series(tr_px, tr_raw_dates, predictions, b, pred_px,
                                                                           pred_dt, tr_pred_px_series,
                                                                           tr_pred_dt_series, curr_pred_px)
-                    fill_eq_params(b, tr_eq_rets, tr_rets)
-                    fill_eq(tr_eq, tr_rets)
+                fill_eq(tr_eq, tr_rets, tr_raw_dates)
 
                 losses[b] = loss
                 curr_progress = progress.print_progress(curr_progress, b, tr_batch_num)
@@ -256,7 +232,7 @@ def train():
             train_avg_loss = np.mean(np.sqrt(losses))
             print("Train loss: %.4f%%" % (train_avg_loss * 100))
 
-            print("Eval test...")
+            print("Eval %d epoch on test set..." % epoch)
             curr_progress = 0
             state = None
             losses = np.zeros((tst_batch_num))
@@ -274,14 +250,12 @@ def train():
                 input, labels = get_batch_input_and_lables(tst_input, tst_labels, b)
                 state, loss, predictions = net.eval(state, input, labels)
 
-                if not is_train() or get_config().SAVE_EQ:
+                if get_config().DRAW_PREDICTIONS:
                     curr_pred_px, pred_px, pred_dt = predict_price_series(tst_px, tst_raw_dates, predictions, b,
                                                                           pred_px, pred_dt,
                                                                           tst_pred_px_series,
                                                                           tst_pred_dt_series, curr_pred_px)
-
-                    fill_eq_params(b, tst_eq_rets, tst_rets)
-                    fill_eq(tst_eq, tst_rets)
+                fill_eq(tst_eq, tst_rets, tst_raw_dates)
 
                 losses[b] = loss
                 curr_progress = progress.print_progress(curr_progress, b, tst_batch_num)
@@ -290,9 +264,53 @@ def train():
             tst_avg_loss = np.mean(np.sqrt(losses))
             print("Test loss: %.4f%%" % (tst_avg_loss * 100))
 
+            # draw plots in test mode and break
+            if not is_train():
+                dt = build_time_axis(tr_raw_dates)
+
+                if get_config().DRAW_PREDICTIONS:
+                    plot_prediction('Train', dt, tr_px, tr_pred_px_series, tr_pred_dt_series)
+                plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, dt, tr_eq)
+
+                dt = build_time_axis(tst_raw_dates)
+                if get_config().DRAW_PREDICTIONS:
+                    plot_prediction('Test', dt, tst_px, tst_pred_px_series, tst_pred_dt_series)
+                plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, dt, tst_eq)
+
+                show_plots()
+                break
+
             # train
-            if is_train():
-                print("Training...")
+            if is_train() and epoch <= get_config().MAX_EPOCH:
+                # save train progress
+                writer.writerow(
+                    (
+                        epoch,
+                        train_avg_loss,
+                        tst_avg_loss
+                    ))
+                f.flush()
+                # plot and save graphs
+                dt = build_time_axis(tr_raw_dates)
+                fig = plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, dt, tr_eq)
+                fig.savefig('%s/%04d.png' % (get_config().TRAIN_FIG_PATH, epoch))
+                plt.close(fig)
+                if epoch == get_config().MAX_EPOCH:
+                    tr_df = pd.DataFrame({'date': dt, 'capital': tr_eq[0,:]})
+                    tr_df.to_csv(get_config().TRAIN_EQ_PATH, index=False)
+
+                dt = build_time_axis(tst_raw_dates)
+                fig = plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, dt, tst_eq)
+                fig.savefig('%s/%04d.png' % (get_config().TEST_FIG_PATH, epoch))
+                plt.close(fig)
+                if epoch == get_config().MAX_EPOCH:
+                    tr_df = pd.DataFrame({'date': dt, 'capital': tst_eq[0, :]})
+                    tr_df.to_csv(get_config().TEST_EQ_PATH, index=False)
+
+                epoch += 1
+                if epoch > get_config().MAX_EPOCH:
+                    break
+                print("Training %d epoch..." % epoch)
 
                 curr_progress = 0
                 state = None
@@ -307,39 +325,4 @@ def train():
 
                 progress.print_progess_end()
 
-                writer.writerow(
-                    (
-                        epoch,
-                        train_avg_loss,
-                        tst_avg_loss
-                    ))
-
-                f.flush()
                 net.save_weights(get_config().WEIGHTS_PATH, epoch)
-
-                if get_config().SAVE_EQ:
-                    dt = build_time_axis(tr_raw_dates)
-                    fig = plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, tr_eq_rets, dt)
-                    fig.savefig('%s/%04d.png' % (get_config().TRAIN_FIG_PATH, epoch))
-                    plt.close(fig)
-                    dt = build_time_axis(tst_raw_dates)
-                    fig = plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, tst_eq_rets, dt)
-                    fig.savefig('%s/%04d.png' % (get_config().TEST_FIG_PATH, epoch))
-                    plt.close(fig)
-
-                epoch += 1
-            else:
-
-                dt = build_time_axis(tr_raw_dates)
-
-                # plot_prediction('Train', dt, tr_px, tr_pred_px_series, tr_pred_dt_series)
-                plot_eq_v1('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, dt, tr_eq)
-                plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, tr_eq_rets, dt)
-
-                dt = build_time_axis(tst_raw_dates)
-                # plot_prediction('Test', dt, tst_px, tst_pred_px_series, tst_pred_dt_series)
-                plot_eq_v1('Test', get_config().TEST_BEG, get_config().TEST_END, dt, tst_eq)
-                plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, tst_eq_rets, dt)
-
-                show_plots()
-                break

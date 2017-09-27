@@ -16,8 +16,6 @@ TODAY = datetime.datetime.strptime('2017-08-27', '%Y-%m-%d').date()
 
 
 class Config(object):
-    TICKER = 'BAC'
-
     HIST_BEG = YR_90
     HIST_END = TODAY
 
@@ -34,7 +32,7 @@ class Config(object):
     ADJ_CLOSE_DATA_IDX = 8
     ADJ_VOLUME_DATA_IDX = 9
 
-    LSTM_LAYERS_SIZE = [15, 15, 15]
+    LSTM_LAYERS_SIZE = [30, 30, 30, 30]
     # LSTM_LAYERS_SIZE = [5, 5, 5]
     FC_LAYERS_SIZE = [30]
 
@@ -47,7 +45,7 @@ class Config(object):
     MODE = Mode.TRAIN
     EPOCH_WEIGHTS_TO_LOAD = None
 
-    BPTT_STEPS = 20
+    BPTT_STEPS = 100
     PRED_HORIZON = 5
 
     WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/embeddings'

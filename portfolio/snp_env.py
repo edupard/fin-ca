@@ -183,6 +183,16 @@ class SnpEnv(object):
             candidate_date_idx += 1
         return None
 
+    def find_prev_trading_date(self, candidate_date):
+        if not (self.HIST_BEG <= candidate_date <= self.HIST_END):
+            return None
+        candidate_date_idx = self._date_to_idx(candidate_date)
+        while candidate_date_idx > 0:
+            if self.trading_day_mask[candidate_date_idx] == True:
+                return self._idx_to_date(candidate_date_idx)
+            candidate_date_idx -= 1
+        return None
+
     def trading_schedule_generator(self, BEG, END, TRADING_PERIOD_DAYS):
         ent_candidate = BEG
         while True:
@@ -191,8 +201,9 @@ class SnpEnv(object):
                 break
 
             found_days = 0
-            ext_candidate = ent + datetime.timedelta(days=1)
+            ext = ent
             while found_days < TRADING_PERIOD_DAYS:
+                ext_candidate = ext + datetime.timedelta(days=1)
                 ext = self.find_trading_date(ext_candidate)
                 if ext is None:
                     break
