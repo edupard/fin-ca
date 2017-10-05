@@ -164,59 +164,65 @@ def train():
                         curr_px = px[:, data_idx]
                         global_data_idx = beg_data_idx + data_idx
 
-                        if data_idx % get_config().REBALANCE_FREQ == 0:
-                            # close position
+                        date = datetime.datetime.fromtimestamp(raw_dates[data_idx]).date()
+                        open_pos = False
+                        close_pos = False
+                        if get_config().REBALANCE_MON_FRI:
+                            if date.isoweekday() == 1:
+                                open_pos = True
+                            if date.isoweekday() == 5:
+                                close_pos = True
+                        else:
+                            if data_idx % get_config().REBALANCE_FREQ == 0:
+                                close_pos = True
+                                open_pos = True
+
+                        if close_pos:
                             rpl = np.sum(pos * (curr_px - pos_px))
                             cash += rpl
                             pos[:] = 0
-                            # open position
+                        if open_pos:
                             pos_px = curr_px
-                            pos_mask = port_mask[:,data_idx]
+                            pos_mask = port_mask[:, data_idx]
                             num_stks = np.sum(pos_mask)
-                            exp, cov = env.get_exp_and_cov(pos_mask, global_data_idx - get_config().COVARIANCE_LENGTH + 1, global_data_idx)
-                            exp = predictions[:,i,0][pos_mask]
-                            cov = get_config().REBALANCE_FREQ * get_config().REBALANCE_FREQ * cov
-                            capm = Capm(num_stks)
-                            capm.init()
-                            lambda_coef = 1.0
-                            i = 0
-                            best_sharpe = 0
-                            best_weights = None
-                            best_constriant = 0
-                            try:
+                            if get_config().CAPM:
+                                exp, cov = env.get_exp_and_cov(pos_mask,
+                                                               global_data_idx - get_config().COVARIANCE_LENGTH + 1,
+                                                               global_data_idx)
+                                exp = get_config().REBALANCE_FREQ * exp
+                                cov = get_config().REBALANCE_FREQ * get_config().REBALANCE_FREQ * cov
+                                if get_config().CAPM_USE_NET_PREDICTIONS:
+                                    exp = predictions[:, i, 0][pos_mask]
+
+                                capm = Capm(num_stks)
+                                capm.init()
+
+                                best_sharpe = None
+                                best_weights = None
+                                best_constriant = None
                                 while i <= 10000:
-                                    w, sharpe, constraint = capm.fit(exp, cov, lambda_coef)
-                                    # print("Iteration: %d Sharpe: %.2f Constraint: %.6f Lambda: %.6f" % (
-                                    # i, sharpe, constraint, lambda_coef))
-                                    if sharpe >= best_sharpe:
+                                    w, sharpe, constraint = capm.get_params(exp, cov)
+                                    # print("Iteration: %d Sharpe: %.2f Constraint: %.6f" % (i, sharpe, constraint))
+                                    if w is None:
+                                        break
+                                    if best_sharpe is None or sharpe >= best_sharpe:
                                         best_weights = w
                                         best_sharpe = sharpe
                                         best_constriant = constraint
+                                    capm.fit(exp, cov)
+                                    capm.rescale_weights()
 
-                                    # print(w)
-                                    # if constraint > max_constraint:
-                                    #     lambda_coef += constraint - max_constraint
-                                    #     max_constraint = constraint
-                                    # capm.reset_optimizer()
-
-                                    if constraint > 0.01:
-                                        lambda_coef = lambda_coef + 1
-                                    # lambda_coef = lambda_coef * 1
-                                    #     capm.reset_optimizer()
                                     i += 1
-                                    if best_sharpe > 100:
-                                        break
-                            except:
-                                pass
-                            date = datetime.datetime.fromtimestamp(raw_dates[data_idx]).date()
-                            print("Date: %s sharpe: %.2f constraint: %.6f" %
-                                  (date.strftime('%Y-%m-%d'),
-                                   best_sharpe,
-                                   best_constriant)
-                                  )
+                                date = datetime.datetime.fromtimestamp(raw_dates[data_idx]).date()
+                                print("Date: %s sharpe: %.2f constraint: %.6f" %
+                                      (date.strftime('%Y-%m-%d'),
+                                       best_sharpe,
+                                       best_constriant)
+                                      )
 
-                            pos[pos_mask] = best_weights / curr_px[pos_mask]
-                            # pos[pos_mask] = 1 / num_stks / curr_px[pos_mask] * np.sign(predictions[pos_mask, i, 0])
+                                pos[pos_mask] = best_weights / curr_px[pos_mask]
+                            else:
+                                pos[pos_mask] = 1 / num_stks / curr_px[pos_mask] * np.sign(predictions[pos_mask, i, 0])
 
                         urpl = np.sum(pos * (curr_px - pos_px))
                         nlv = cash + urpl

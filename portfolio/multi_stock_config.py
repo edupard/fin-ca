@@ -48,6 +48,7 @@ class Config(object):
 
     BPTT_STEPS = 100
     PRED_HORIZON = 5
+    REBALANCE_MON_FRI = True
     REBALANCE_FREQ = 5
 
     WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/embeddings'
@@ -66,8 +67,10 @@ class Config(object):
     SAVE_EQ = True
 
     RESET_PRED_PX_EACH_N_DAYS = 200
-    COVARIANCE_LENGTH = 60
 
+    CAPM = False
+    CAPM_USE_NET_PREDICTIONS = True
+    COVARIANCE_LENGTH = 60
 
 _config = Config()
 
