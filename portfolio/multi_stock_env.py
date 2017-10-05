@@ -1,5 +1,6 @@
 import numpy as np
 import datetime
+import pandas as pd
 
 from download_utils import load_npz_data
 from portfolio.multi_stock_config import get_config
@@ -19,6 +20,39 @@ class Env(object):
         self._tickers = tickers
         self.stks = self.tickers.shape[0]
 
+        days = raw_dt.shape[0]
+
+        def _idx_to_date(idx):
+            return datetime.datetime.fromtimestamp(raw_dt[idx]).date()
+
+        # calc data dates range
+        HIST_BEG = _idx_to_date(0)
+        HIST_END = _idx_to_date(-1)
+
+        def _date_to_idx(date):
+            if HIST_BEG <= date <= HIST_END:
+                return (date - HIST_BEG).days
+            return None
+
+        # calc snp_mask
+        snp_mask = np.full((self.stks, days), False)
+
+        snp_mask_df = pd.read_csv('data/snp/snp_mask.csv')
+
+        for idx, row in snp_mask_df.iterrows():
+            _from = datetime.datetime.strptime(row['from'], '%Y-%m-%d').date()
+            _to = datetime.datetime.strptime(row['to'], '%Y-%m-%d').date()
+            _ticker = row['ticker']
+            stk_idx = self._ticker_to_idx(_ticker)
+            if stk_idx is None:
+                continue
+            _from = max(_from, HIST_BEG)
+            _to = min(_to, HIST_END)
+            _from_idx = _date_to_idx(_from)
+            _to_idx = _date_to_idx(_to)
+
+            snp_mask[stk_idx, _from_idx:_to_idx + 1] = True
+
         # calc tradable_mask, traded_stocks_per_day, trading_day_mask
         tradable_mask = np.all(raw_data > 0.0, axis=2)
         traded_stocks_per_day = tradable_mask[:, :].sum(0)
@@ -32,6 +66,7 @@ class Env(object):
         self.raw_data = raw_data[:, trading_day_mask, :]
         self.traded_stocks_per_day = traded_stocks_per_day[trading_day_mask]
         self.tradable_mask = tradable_mask[:, trading_day_mask]
+        self.snp_mask= snp_mask[:, trading_day_mask]
 
         # prepare input array
         input = np.zeros((self.stks, self.trading_days, 6))
@@ -111,29 +146,42 @@ class Env(object):
     def tickers(self):
         return self._tickers
 
-    def get_prev_trading_day_data_idx(self, LOOKUP_DATE):
-        dt = datetime.datetime.combine(LOOKUP_DATE, datetime.time.min)
-        ts = dt.timestamp()
-        valid_dates_mask = self.raw_dt < ts
-        valid_dates_idxs = np.nonzero(valid_dates_mask)[0]
-        if valid_dates_idxs.shape[0] > 0:
-            return valid_dates_idxs[-1]
-        return None
+    def get_timestamp(self, DATE):
+        dt = datetime.datetime.combine(DATE, datetime.time.min)
+        return dt.timestamp()
 
-    def get_next_trading_day_data_idx(self, LOOKUP_DATE):
-        dt = datetime.datetime.combine(LOOKUP_DATE, datetime.time.min)
-        ts = dt.timestamp()
-        valid_dates_mask = self.raw_dt >= ts
-        valid_dates_idxs = np.nonzero(valid_dates_mask)[0]
-        if valid_dates_idxs.shape[0] > 0:
-            return valid_dates_idxs[0]
-        return None
+    def get_data_idxs_range(self, BEG, END):
+        BEG_TS = self.get_timestamp(BEG)
+        END_TS = self.get_timestamp(END)
+
+        beg_idx = None
+        end_idx = None
+        for i in range(self.trading_days):
+            ts = self.raw_dt[i]
+            if ts >= BEG_TS and beg_idx is None:
+                beg_idx = i
+            if ts <= END_TS:
+                end_idx = i
+        return beg_idx, end_idx
+
 
     def get_input(self, BEG_DATA_IDX, END_DATA_IDX):
-        return self.input[:, BEG_DATA_IDX: END_DATA_IDX, :]
+        return self.input[:, BEG_DATA_IDX: END_DATA_IDX + 1, :]
 
     def get_adj_close_px(self, BEG_DATA_IDX, END_DATA_IDX):
-        return self.raw_data[:, BEG_DATA_IDX: END_DATA_IDX, get_config().ADJ_CLOSE_DATA_IDX]
+        return self.raw_data[:, BEG_DATA_IDX: END_DATA_IDX + 1, get_config().ADJ_CLOSE_DATA_IDX]
 
     def get_raw_dates(self, BEG_DATA_IDX, END_DATA_IDX):
-        return self.raw_dt[BEG_DATA_IDX: END_DATA_IDX]
+        return self.raw_dt[BEG_DATA_IDX: END_DATA_IDX + 1]
+
+    def get_tradeable_mask(self, BEG_DATA_IDX, END_DATA_IDX):
+        return self.tradable_mask[:,BEG_DATA_IDX: END_DATA_IDX + 1]
+
+    def get_portfolio_mask(self, BEG_DATA_IDX, END_DATA_IDX):
+        return self.tradable_mask[:, BEG_DATA_IDX: END_DATA_IDX + 1] & self.snp_mask[:, BEG_DATA_IDX: END_DATA_IDX + 1]
+
+    def get_exp_and_cov(self, mask, BEG_DATA_IDX, END_DATA_IDX):
+        r = self.input[mask, BEG_DATA_IDX : END_DATA_IDX + 1, 1]
+        exp = np.mean(r, axis=1)
+        cov = np.cov(r)
+        return exp, cov

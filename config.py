@@ -88,6 +88,8 @@ class Config(object):
     LONG_ALLOC_PCT = 0.7
     SHORT_ALLOC_PCT = 1 - LONG_ALLOC_PCT
 
+    SLIPPAGE = 2 * 5 / 100 / 100
+
     ADJ_PX_FEATURES = ['a_o', 'a_h', 'a_l', 'a_c', 'a_v', 'to']
     PX_FEATURES = ['o', 'h', 'l', 'c', 'v', 'to']
 

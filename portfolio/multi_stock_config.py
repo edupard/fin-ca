@@ -42,11 +42,13 @@ class Config(object):
     TEST_BEG = YR_07
     TEST_END = HIST_END
 
-    MODE = Mode.TRAIN
-    EPOCH_WEIGHTS_TO_LOAD = None
+    MODE = Mode.TEST
+    EPOCH_WEIGHTS_TO_LOAD = 1000
+    MAX_EPOCH = 1000
 
     BPTT_STEPS = 100
     PRED_HORIZON = 5
+    REBALANCE_FREQ = 5
 
     WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/embeddings'
     TRAIN_STAT_PATH = '%s/train_stat.csv' % WEIGHTS_FOLDER_PATH
@@ -64,6 +66,7 @@ class Config(object):
     SAVE_EQ = True
 
     RESET_PRED_PX_EACH_N_DAYS = 200
+    COVARIANCE_LENGTH = 60
 
 
 _config = Config()

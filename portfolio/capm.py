@@ -17,7 +17,10 @@ class Capm:
         self.port_var = port_var = tf.matmul(tf.matmul(w, cov, transpose_a=True), w, name='port_var')
         self.sharpe_pow_2 = sharpe_pow_2 = tf.reshape(port_exp_pow_2 / port_var, shape=())
 
-        self.constraint_pow_2 = constraint_pow_2 = tf.square(tf.reduce_sum(tf.abs(w)) - 1, name='constraint')
+        self.constraint = constraint = tf.reduce_sum(tf.abs(w))
+        self.constraint_pow_2 = constraint_pow_2 = tf.square(constraint - 1, name='constraint')
+
+        self.rescale_op = self.w.assign(self.w / constraint)
 
         self.loss = loss = -sharpe_pow_2 + lambda_coef * constraint_pow_2
 
@@ -30,13 +33,8 @@ class Capm:
 
         self.sess = tf.Session()
 
-    def reset_optimizer(self):
-        self.optimizer = optimizer = tf.train.RMSPropOptimizer()
-        # self.optimizer = optimizer = tf.train.AdamOptimizer()
-        # self.optimizer = optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.0001)
-        self.train = optimizer.minimize(self.loss)
-        init = tf.global_variables_initializer()
-        self.sess.run(init)
+    def rescale_weights(self):
+        self.sess.run(self.rescale_op)
 
     def init(self):
         print('initializing weights...')
@@ -53,5 +51,5 @@ class Capm:
         try:
             return w, math.sqrt(sharpe_pow_2), math.sqrt(constraint_pow_2)
         except:
-            _debug = 0
             pass
+        return w, sharpe_pow_2, constraint_pow_2

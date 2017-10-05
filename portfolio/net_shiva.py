@@ -8,6 +8,7 @@ class NetShiva(object):
     def __init__(self):
         print('creating neural network...')
         self.labels = labels = tf.placeholder(tf.float32, [None, None], name='labels')
+        self.mask = mask = tf.placeholder(tf.float32, [None, None], name='mask')
         self.input = input = tf.placeholder(tf.float32, [None, None, 6], name='input')
 
         cells = []
@@ -40,7 +41,8 @@ class NetShiva(object):
 
         with tf.name_scope('loss'):
             diff = self.returns - tf.expand_dims(labels, 2)
-            self.cost = tf.reduce_mean(tf.square(diff))
+            self.cost = tf.reduce_sum(tf.multiply(tf.square(diff), tf.expand_dims(mask, 2))) / tf.reduce_sum(mask)
+            # self.cost = tf.reduce_mean(tf.square(diff))
             self.optimizer = tf.train.AdamOptimizer()
             # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
             self.vars = tf.trainable_variables()
@@ -70,15 +72,15 @@ class NetShiva(object):
             feed_dict[self.state[idx].h] = s.h
             idx += 1
 
-    def eval(self, state, input, labels):
-        feed_dict = {self.input: input, self.labels: labels}
+    def eval(self, state, input, labels, mask):
+        feed_dict = {self.input: input, self.labels: labels, self.mask: mask}
         self.fill_feed_dict(feed_dict, state)
 
         new_state, cost, returns = self.sess.run((self.new_state, self.cost, self.returns), feed_dict)
         return new_state, cost, returns
 
-    def fit(self, state, input, labels):
-        feed_dict = {self.input: input, self.labels: labels}
+    def fit(self, state, input, labels, mask):
+        feed_dict = {self.input: input, self.labels: labels, self.mask: mask}
         self.fill_feed_dict(feed_dict, state)
         # gv = self.sess.run((self.grads_and_vars), feed_dict)
         new_state, cost, returns, _ = self.sess.run((self.new_state, self.cost, self.returns, self.train), feed_dict)

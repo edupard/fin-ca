@@ -1,6 +1,8 @@
 import numpy as np
 import csv
 import os.path
+import pandas as pd
+import datetime
 
 from portfolio.net_shiva import NetShiva
 from portfolio.multi_stock_config import get_config, Mode
@@ -8,20 +10,21 @@ from portfolio.stat import print_alloc, get_draw_down, get_sharpe_ratio, get_cap
 from portfolio.graphs import plot_equity_curve, show_plots, create_time_serie_fig, plot_time_serie
 import progress
 import matplotlib.pyplot as plt
+from portfolio.capm import Capm
 
 from portfolio.multi_stock_env import Env, date_from_timestamp
 
 if get_config().MODE == Mode.TRAIN:
     plt.ioff()
 
-if not os.path.exists(get_config().TRAIN_FIG_PATH):
-    os.makedirs(get_config().TRAIN_FIG_PATH)
-if not os.path.exists(get_config().TEST_FIG_PATH):
-    os.makedirs(get_config().TEST_FIG_PATH)
 
-
-def flatten(l):
-    return [item for sublist in l for item in sublist]
+def create_folders():
+    if not os.path.exists(get_config().WEIGHTS_FOLDER_PATH):
+        os.makedirs(get_config().WEIGHTS_FOLDER_PATH)
+    if not os.path.exists(get_config().TRAIN_FIG_PATH):
+        os.makedirs(get_config().TRAIN_FIG_PATH)
+    if not os.path.exists(get_config().TEST_FIG_PATH):
+        os.makedirs(get_config().TEST_FIG_PATH)
 
 
 def get_batches_num(ds_sz, bptt_steps):
@@ -42,34 +45,21 @@ def build_time_axis(raw_dates):
         dt.append(date_from_timestamp(raw_dt))
     return dt
 
-
-def plot_prediction(name, dt, px, pred_px_series, pred_dt_series):
-    ax = create_time_serie_fig(name)
-    plot_time_serie(ax, dt, px[0, :], color='b')
-    for i in range(len(pred_px_series)):
-        pred_px = pred_px_series[i]
-        pred_px = pred_px[0, :]
-        pred_dt = pred_dt_series[i]
-        plot_time_serie(ax, pred_dt, pred_px, color='r')
-
-
-def plot_eq(name, BEG, END, eq_rets, dt):
+def plot_eq(name, BEG, END, dt, capital):
     years = (END - BEG).days / 365
-    capital = get_capital(eq_rets[:], False)
     dd = get_draw_down(capital, False)
-    sharpe = get_sharpe_ratio(eq_rets[:], years)
-    y_avg = get_avg_yeat_ret(eq_rets[:], years)
+    rets = capital[1:] - capital[:-1]
+    sharpe = get_sharpe_ratio(rets, years)
+    y_avg = (capital[-1] - capital[0]) / years
     print('%s dd: %.2f%% y_avg: %.2f%% sharpe: %.2f' % (name, dd * 100, y_avg * 100, sharpe))
-    return plot_equity_curve("%s equity curve" % name, dt, capital[:-1])
+    return plot_equity_curve("%s equity curve" % name, dt, capital[:])
 
 
 def train():
-    if not os.path.exists(get_config().WEIGHTS_FOLDER_PATH):
-        os.makedirs(get_config().WEIGHTS_FOLDER_PATH)
+    create_folders()
 
     env = Env()
     net = NetShiva()
-    net.init()
 
     if not os.path.exists(get_config().TRAIN_STAT_PATH):
         with open(get_config().TRAIN_STAT_PATH, 'a', newline='') as f:
@@ -92,202 +82,225 @@ def train():
     with open_train_stat_file() if is_train() else dummy_context_mgr() as f:
         if is_train():
             writer = csv.writer(f)
-        if get_config().EPOCH_WEIGHTS_TO_LOAD is not None:
+        if get_config().EPOCH_WEIGHTS_TO_LOAD != 0:
             net.load_weights(get_config().WEIGHTS_PATH, get_config().EPOCH_WEIGHTS_TO_LOAD)
             epoch = get_config().EPOCH_WEIGHTS_TO_LOAD
             if is_train():
                 epoch += 1
         else:
+            net.init()
             epoch = 0
 
         def get_net_data(BEG, END):
-            beg_idx = env.get_next_trading_day_data_idx(BEG)
-            end_idx = env.get_prev_trading_day_data_idx(END)
+            beg_idx, end_idx = env.get_data_idxs_range(BEG, END)
 
             raw_dates = env.get_raw_dates(beg_idx, end_idx)
             input = env.get_input(beg_idx, end_idx)
             px = env.get_adj_close_px(beg_idx, end_idx)
             px_pred_hor = env.get_adj_close_px(beg_idx + get_config().PRED_HORIZON, end_idx + get_config().PRED_HORIZON)
-            px_t1 = env.get_adj_close_px(beg_idx + 1, end_idx + 1)
+            tradeable_mask = env.get_tradeable_mask(beg_idx, end_idx)
+            port_mask = env.get_portfolio_mask(beg_idx, end_idx)
+
             ds_sz = px_pred_hor.shape[1]
+
             raw_dates = raw_dates[:ds_sz]
             input = input[:, :ds_sz, :]
+            tradeable_mask = tradeable_mask[:,:ds_sz]
+            port_mask = port_mask[:, :ds_sz]
             px = px[:, :ds_sz]
-            px_t1 = px_t1[:, :ds_sz]
+
             labels = (px_pred_hor - px) / px
-            rets = (px_t1 - px) / px
             batch_num = get_batches_num(ds_sz, get_config().BPTT_STEPS)
 
-            return ds_sz, batch_num, raw_dates, px, input, labels, rets
+            return beg_idx, ds_sz, batch_num, raw_dates, tradeable_mask, port_mask, px, input, labels
 
-        tr_ds_sz, tr_batch_num, tr_raw_dates, tr_px, tr_input, tr_labels, tr_rets = get_net_data(get_config().TRAIN_BEG,
+        tr_beg_data_idx, tr_ds_sz, tr_batch_num, tr_raw_dates, tr_tradeable_mask, tr_port_mask, tr_px, tr_input, tr_labels = get_net_data(get_config().TRAIN_BEG,
                                                                                                  get_config().TRAIN_END)
 
-        tst_ds_sz, tst_batch_num, tst_raw_dates, tst_px, tst_input, tst_labels, tst_rets = get_net_data(
+        tst_beg_data_idx, tst_ds_sz, tst_batch_num, tst_raw_dates, tst_tradeable_mask, tst_port_mask, tst_px, tst_input, tst_labels = get_net_data(
             get_config().TEST_BEG,
             get_config().TEST_END)
 
-        if not is_train() or get_config().SAVE_EQ:
-            tr_pred_px_series = []
-            tr_pred_dt_series = []
-            tst_pred_px_series = []
-            tst_pred_dt_series = []
+        tr_eq = np.zeros((tr_ds_sz))
+        tst_eq = np.zeros((tst_ds_sz))
 
-            tr_eq_rets = np.zeros((total_tickers, tr_ds_sz))
-            tst_eq_rets = np.zeros((total_tickers, tst_ds_sz))
-
-        def get_batch_input_and_lables(input, labels, b):
+        def get_batch_slice(input, labels, mask, b):
             b_i = b * get_config().BPTT_STEPS
             e_i = (b + 1) * get_config().BPTT_STEPS
-            return input[:, b_i: e_i, :], labels[:, b_i: e_i]
+            return input[:, b_i: e_i, :], labels[:, b_i: e_i], mask[:, b_i: e_i].astype(np.float32)
 
-        def predict_price_series(px, raw_dates, predictions, b, pred_px, pred_dt, pred_px_series,
-                                 pred_dt_series, curr_pred_px):
-            for i in range(predictions.shape[1]):
+        while epoch <= get_config().MAX_EPOCH:
 
-                data_idx = b * get_config().BPTT_STEPS + i
-                serie_idx = data_idx % get_config().RESET_PRED_PX_EACH_N_DAYS
-
-                if serie_idx == 0:
-                    # finish old serie is exists
-                    if pred_px is not None:
-                        pred_px[:, get_config().RESET_PRED_PX_EACH_N_DAYS] = curr_pred_px
-                        pred_dt[get_config().RESET_PRED_PX_EACH_N_DAYS] = date_from_timestamp(
-                            raw_dates[data_idx])
-
-                        pred_px_series.append(pred_px)
-                        pred_dt_series.append(pred_dt)
-                    # reset price
-                    curr_pred_px = px[:, data_idx]
-                    # create new serie
-                    pred_px = np.zeros((total_tickers, get_config().RESET_PRED_PX_EACH_N_DAYS + 1))
-                    pred_dt = [None] * (get_config().RESET_PRED_PX_EACH_N_DAYS + 1)
-
-                # fill values
-                pred_px[:, serie_idx] = curr_pred_px
-                pred_dt[serie_idx] = date_from_timestamp(raw_dates[data_idx])
-
-                # update pred px
-                curr_pred_px += (predictions[:, i, 0] / get_config().PRED_HORIZON) * curr_pred_px
-
-            return curr_pred_px, pred_px, pred_dt
-
-        def fill_eq_params(b, eq_rets, rets):
-            s_i = b * get_config().BPTT_STEPS
-            e_i = (b + 1) * get_config().BPTT_STEPS
-            eq_rets[:, s_i: e_i] = (
-                rets[:, s_i: e_i] * np.sign(predictions[:, :, 0]))
-
-        while True:
-
-            print("Epoch %d" % epoch)
-
-            print("Eval train...")
-            curr_progress = 0
+            print("Eval %d epoch on train set..." % epoch)
+            batch_num = tr_batch_num
+            input = tr_input
+            labels = tr_labels
+            px = tr_px
+            mask = tr_tradeable_mask
+            port_mask = tr_port_mask
+            eq = tr_eq
+            beg_data_idx = tr_beg_data_idx
+            raw_dates = tr_raw_dates
             state = None
-            losses = np.zeros((tr_batch_num))
-            curr_pred_px = None
-            pred_px = None
-            pred_dt = None
 
-            for b in range(tr_batch_num):
-                if state is None:
-                    state = net.zero_state(len(env.tickers))
+            def eval():
+                nonlocal raw_dates, beg_data_idx, batch_num, input, labels, px, mask, port_mask, eq, state
+                curr_progress = 0
+                cash = 1
+                pos = np.zeros((total_tickers))
+                pos_px = np.zeros((total_tickers))
+                losses = np.zeros((batch_num))
 
-                input, labels = get_batch_input_and_lables(tr_input, tr_labels, b)
-                state, loss, predictions = net.eval(state, input, labels)
+                for b in range(batch_num):
+                    if state is None:
+                        state = net.zero_state(total_tickers)
 
-                if not is_train() or get_config().SAVE_EQ:
-                    curr_pred_px, pred_px, pred_dt = predict_price_series(tr_px, tr_raw_dates, predictions, b, pred_px,
-                                                                          pred_dt, tr_pred_px_series,
-                                                                          tr_pred_dt_series, curr_pred_px)
-                    fill_eq_params(b, tr_eq_rets, tr_rets)
+                    _input, _labels, _mask = get_batch_slice(input, labels, mask, b)
+                    state, loss, predictions = net.eval(state, _input, _labels, _mask)
 
-                losses[b] = loss
-                curr_progress = progress.print_progress(curr_progress, b, tr_batch_num)
 
-            progress.print_progess_end()
-            train_avg_loss = np.mean(np.sqrt(losses))
-            print("Train loss: %.4f%%" % (train_avg_loss * 100))
+                    for i in range(predictions.shape[1]):
+                        data_idx = b * get_config().BPTT_STEPS + i
+                        curr_px = px[:, data_idx]
+                        global_data_idx = beg_data_idx + data_idx
 
-            print("Eval test...")
-            curr_progress = 0
+                        if data_idx % get_config().REBALANCE_FREQ == 0:
+                            # close position
+                            rpl = np.sum(pos * (curr_px - pos_px))
+                            cash += rpl
+                            pos[:] = 0
+                            # open position
+                            pos_px = curr_px
+                            pos_mask = port_mask[:,data_idx]
+                            num_stks = np.sum(pos_mask)
+                            exp, cov = env.get_exp_and_cov(pos_mask, global_data_idx - get_config().COVARIANCE_LENGTH + 1, global_data_idx)
+                            exp = predictions[:,i,0][pos_mask]
+                            cov = get_config().REBALANCE_FREQ * get_config().REBALANCE_FREQ * cov
+                            capm = Capm(num_stks)
+                            capm.init()
+                            lambda_coef = 1.0
+                            i = 0
+                            best_sharpe = 0
+                            best_weights = None
+                            best_constriant = 0
+                            try:
+                                while i <= 10000:
+                                    w, sharpe, constraint = capm.fit(exp, cov, lambda_coef)
+                                    # print("Iteration: %d Sharpe: %.2f Constraint: %.6f Lambda: %.6f" % (
+                                    # i, sharpe, constraint, lambda_coef))
+                                    if sharpe >= best_sharpe:
+                                        best_weights = w
+                                        best_sharpe = sharpe
+                                        best_constriant = constraint
+
+                                    # print(w)
+                                    # if constraint > max_constraint:
+                                    #     lambda_coef += constraint - max_constraint
+                                    #     max_constraint = constraint
+                                    # capm.reset_optimizer()
+
+                                    if constraint > 0.01:
+                                        lambda_coef = lambda_coef + 1
+                                    # lambda_coef = lambda_coef * 1
+                                    #     capm.reset_optimizer()
+                                    i += 1
+                                    if best_sharpe > 100:
+                                        break
+                            except:
+                                pass
+                            date = datetime.datetime.fromtimestamp(raw_dates[data_idx]).date()
+                            print("Date: %s sharpe: %.2f constraint: %.6f" %
+                                  (date.strftime('%Y-%m-%d'),
+                                   best_sharpe,
+                                   best_constriant)
+                                  )
+
+                            pos[pos_mask] = best_weights / curr_px[pos_mask]
+                            # pos[pos_mask] = 1 / num_stks / curr_px[pos_mask] * np.sign(predictions[pos_mask, i, 0])
+
+                        urpl = np.sum(pos * (curr_px - pos_px))
+                        nlv = cash + urpl
+
+                        eq[data_idx] = nlv
+
+                    losses[b] = loss
+                    curr_progress = progress.print_progress(curr_progress, b, tr_batch_num)
+
+                progress.print_progess_end()
+                avg_loss = np.mean(np.sqrt(losses))
+                return avg_loss
+
+            tr_avg_loss = eval()
+            print("Train loss: %.4f%%" % (tr_avg_loss * 100))
+
+            print("Eval %d epoch on train set..." % epoch)
+            batch_num = tst_batch_num
+            input = tst_input
+            labels = tst_labels
+            px = tst_px
+            mask = tst_tradeable_mask
+            port_mask = tst_port_mask
+            eq = tst_eq
+            beg_data_idx = tst_beg_data_idx
+            raw_dates = tst_raw_dates
             state = None
-            losses = np.zeros((tst_batch_num))
-            curr_pred_px = None
-            pred_px = None
-            pred_dt = None
 
-            for b in range(tst_batch_num):
-                if state is None:
-                    state = net.zero_state(len(env.tickers))
-
-                input, labels = get_batch_input_and_lables(tst_input, tst_labels, b)
-                state, loss, predictions = net.eval(state, input, labels)
-
-                if not is_train() or get_config().SAVE_EQ:
-                    curr_pred_px, pred_px, pred_dt = predict_price_series(tst_px, tst_raw_dates, predictions, b,
-                                                                          pred_px, pred_dt,
-                                                                          tst_pred_px_series,
-                                                                          tst_pred_dt_series, curr_pred_px)
-                    fill_eq_params(b, tst_eq_rets, tst_rets)
-
-                losses[b] = loss
-                curr_progress = progress.print_progress(curr_progress, b, tst_batch_num)
-
-            progress.print_progess_end()
-            tst_avg_loss = np.mean(np.sqrt(losses))
+            tst_avg_loss = eval()
             print("Test loss: %.4f%%" % (tst_avg_loss * 100))
 
-            # train
-            if is_train():
-                print("Training...")
+            if not is_train():
+                dt = build_time_axis(tr_raw_dates)
+                plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, dt, tr_eq)
+
+                dt = build_time_axis(tst_raw_dates)
+                plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, dt, tst_eq)
+
+                show_plots()
+                break
+
+            if is_train() and epoch <= get_config().MAX_EPOCH:
+                writer.writerow(
+                    (
+                        epoch,
+                        tr_avg_loss,
+                        tst_avg_loss
+                    ))
+
+                f.flush()
+
+                # plot and save graphs
+                dt = build_time_axis(tr_raw_dates)
+                fig = plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, dt, tr_eq)
+                fig.savefig('%s/%04d.png' % (get_config().TRAIN_FIG_PATH, epoch))
+                plt.close(fig)
+                if epoch == get_config().MAX_EPOCH:
+                    tr_df = pd.DataFrame({'date': dt, 'capital': tr_eq[:]})
+                    tr_df.to_csv(get_config().TRAIN_EQ_PATH, index=False)
+
+                dt = build_time_axis(tst_raw_dates)
+                fig = plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, dt, tst_eq)
+                fig.savefig('%s/%04d.png' % (get_config().TEST_FIG_PATH, epoch))
+                plt.close(fig)
+                if epoch == get_config().MAX_EPOCH:
+                    tr_df = pd.DataFrame({'date': dt, 'capital': tst_eq[:]})
+                    tr_df.to_csv(get_config().TEST_EQ_PATH, index=False)
+
+                epoch += 1
+                if epoch > get_config().MAX_EPOCH:
+                    break
+                print("Training %d epoch..." % epoch)
 
                 curr_progress = 0
                 state = None
                 for b in range(tr_batch_num):
                     if state is None:
-                        state = net.zero_state(len(env.tickers))
+                        state = net.zero_state(total_tickers)
 
-                    input, labels = get_batch_input_and_lables(tr_input, tr_labels, b)
-                    state, loss, predictions = net.fit(state, input, labels)
+                    input, labels, mask = get_batch_slice(tr_input, tr_labels, tr_tradeable_mask, b)
+                    state, loss, predictions = net.fit(state, input, labels, mask)
 
                     curr_progress = progress.print_progress(curr_progress, b, tr_batch_num)
 
                 progress.print_progess_end()
 
-                writer.writerow(
-                    (
-                        epoch,
-                        train_avg_loss,
-                        tst_avg_loss
-                    ))
-
-                f.flush()
                 net.save_weights(get_config().WEIGHTS_PATH, epoch)
-
-                if get_config().SAVE_EQ:
-                    dt = build_time_axis(tr_raw_dates)
-                    mean_tr_eq_rets = np.mean(tr_eq_rets, axis=0)
-                    fig = plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, mean_tr_eq_rets, dt)
-                    fig.savefig('%s/%04d.png' % (get_config().TRAIN_FIG_PATH, epoch))
-                    plt.close(fig)
-                    dt = build_time_axis(tst_raw_dates)
-                    mean_tst_eq_rets = np.mean(tst_eq_rets, axis=0)
-                    fig = plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, mean_tst_eq_rets, dt)
-                    fig.savefig('%s/%04d.png' % (get_config().TEST_FIG_PATH, epoch))
-                    plt.close(fig)
-
-                epoch += 1
-            else:
-
-                dt = build_time_axis(tr_raw_dates)
-                # plot_prediction('Train', dt, tr_px, tr_pred_px_series, tr_pred_dt_series)
-                plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, tr_eq_rets, dt)
-
-                dt = build_time_axis(tst_raw_dates)
-                # plot_prediction('Test', dt, tst_px, tst_pred_px_series, tst_pred_dt_series)
-                plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, tst_eq_rets, dt)
-
-                show_plots()
-                break

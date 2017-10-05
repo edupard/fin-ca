@@ -13,12 +13,15 @@ DDMMMYY_FMT = matplotlib.dates.DateFormatter('%y %b %d')
 YYYY_FMT = matplotlib.dates.DateFormatter('%Y')
 
 curves = [
-    # ('data/eq/eq_70_30_net.csv','%d.%m.%Y', '70x30 rbm net mon-fri','b'),
+    ('data/eq/eq_70_30_net.csv','%d.%m.%Y', '70x30 rbm net mon-fri','b'),
     ('data/eq/eq_70_30_no_net.csv','%d.%m.%Y', '70x30 no net mon-fri','r'),
 
+    # ('data/eq/eq_70_30_net_sl_5_bp.csv','%d.%m.%Y', '70x30 rbm net mon-fri','b'),
+    # ('data/eq/eq_70_30_no_net_sl_5_bp.csv','%d.%m.%Y', '70x30 no net mon-fri','r'),
+
     # ('data/eq/eq_70_30_net_5d.csv','%Y-%m-%d', '70x30 l/s softmax net 1d-4d ','c'),
-    ('data/eq/eq_70_30_no_net_5d.csv','%Y-%m-%d', '70x30 no net 1d-5d','k'),
-    ('data/eq/eq_70_30_no_net_1d.csv','%Y-%m-%d', '70x30 no net 1d','c'),
+    # ('data/eq/eq_70_30_no_net_5d.csv','%Y-%m-%d', '70x30 no net 1d-5d','k'),
+    # ('data/eq/eq_70_30_no_net_1d.csv','%Y-%m-%d', '70x30 no net 1d','c'),
 
 
     # ('data/eq/eq_long_softmax.csv','%Y-%m-%d', 'long softmax','g'),

@@ -436,61 +436,61 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
 
         _int_r = s_int_r[beg:end]
 
-        # third variant: no net
-        _int_r_sorted = np.sort(_int_r)
-        _sel_stks = min(get_config().SLCT_VAL, _int_r_sorted.shape[0])
-        if _sel_stks == 0:
-            continue
-        _l_b = _int_r_sorted[_sel_stks - 1]
-        _s_b = _int_r_sorted[-_sel_stks]
-        sel_l_cond = ~_s_s_l
-        sel_l_cond &= _int_r <= _l_b
-        sel_s_cond = ~_s_s_s
-        sel_s_cond &= _int_r >= _s_b
+        # # third variant: no net
+        # _int_r_sorted = np.sort(_int_r)
+        # _sel_stks = min(get_config().SLCT_VAL, _int_r_sorted.shape[0])
+        # if _sel_stks == 0:
+        #     continue
+        # _l_b = _int_r_sorted[_sel_stks - 1]
+        # _s_b = _int_r_sorted[-_sel_stks]
+        # sel_l_cond = ~_s_s_l
+        # sel_l_cond &= _int_r <= _l_b
+        # sel_s_cond = ~_s_s_s
+        # sel_s_cond &= _int_r >= _s_b
 
-        # # second variant - metric
-        # # by yield
-        # _metric = np.sign(_prob_l - prob_median) * _int_r
-        # # by prob * yield
-        # # _metric = (_prob_l - prob_median) * _int_r
-        # _metric_l = _metric[pred_long_cond]
-        # _metric_s = _metric[~pred_long_cond]
-        # _metric_sorted_l = np.sort(_metric_l)
-        # _metric_sorted_s = np.sort(_metric_s)
-        #
-        # MOD = False
-        # if MOD:
-        #     _metric_sorted_l = _metric_sorted_l[_metric_sorted_l >= 0]
-        #     _metric_sorted_s = _metric_sorted_s[_metric_sorted_s >= 0]
-        #     _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_l.shape[0])
-        #     if _sel_stks == 0:
-        #         continue
-        #     _l_b = _metric_sorted_l[_sel_stks - 1]
-        #     _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_s.shape[0])
-        #     if _sel_stks == 0:
-        #         continue
-        #     _s_b = _metric_sorted_s[_sel_stks - 1]
-        #
-        #     sel_l_cond = _s_s_l
-        #     sel_l_cond |= pred_long_cond
-        #     sel_l_cond &= (_metric <= _l_b) & (_metric >= 0)
-        #
-        #     sel_s_cond = _s_s_s
-        #     sel_s_cond |= ~pred_long_cond
-        #     sel_s_cond &= (_metric <= _s_b) & (_metric >= 0)
-        # else:
-        #     _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_l.shape[0])
-        #     _l_b = _metric_sorted_l[_sel_stks - 1]
-        #     _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_s.shape[0])
-        #     _s_b = _metric_sorted_s[_sel_stks - 1]
-        #
-        #     sel_l_cond = _s_s_l
-        #     sel_l_cond |= pred_long_cond
-        #     sel_l_cond &= (_metric <= _l_b)
-        #
-        #     sel_s_cond = _s_s_s
-        #     sel_s_cond |= ~pred_long_cond
-        #     sel_s_cond &= (_metric <= _s_b)
+        # second variant - metric
+        # by yield
+        _metric = np.sign(_prob_l - prob_median) * _int_r
+        # by prob * yield
+        # _metric = (_prob_l - prob_median) * _int_r
+        _metric_l = _metric[pred_long_cond]
+        _metric_s = _metric[~pred_long_cond]
+        _metric_sorted_l = np.sort(_metric_l)
+        _metric_sorted_s = np.sort(_metric_s)
+
+        MOD = False
+        if MOD:
+            _metric_sorted_l = _metric_sorted_l[_metric_sorted_l >= 0]
+            _metric_sorted_s = _metric_sorted_s[_metric_sorted_s >= 0]
+            _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_l.shape[0])
+            if _sel_stks == 0:
+                continue
+            _l_b = _metric_sorted_l[_sel_stks - 1]
+            _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_s.shape[0])
+            if _sel_stks == 0:
+                continue
+            _s_b = _metric_sorted_s[_sel_stks - 1]
+
+            sel_l_cond = _s_s_l
+            sel_l_cond |= pred_long_cond
+            sel_l_cond &= (_metric <= _l_b) & (_metric >= 0)
+
+            sel_s_cond = _s_s_s
+            sel_s_cond |= ~pred_long_cond
+            sel_s_cond &= (_metric <= _s_b) & (_metric >= 0)
+        else:
+            _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_l.shape[0])
+            _l_b = _metric_sorted_l[_sel_stks - 1]
+            _sel_stks = min(get_config().SLCT_VAL, _metric_sorted_s.shape[0])
+            _s_b = _metric_sorted_s[_sel_stks - 1]
+
+            sel_l_cond = _s_s_l
+            sel_l_cond |= pred_long_cond
+            sel_l_cond &= (_metric <= _l_b)
+
+            sel_s_cond = _s_s_s
+            sel_s_cond |= ~pred_long_cond
+            sel_s_cond &= (_metric <= _s_b)
 
         # # initial variant
         # if get_config().SLCT_TYPE == SelectionType.PCT:
@@ -610,7 +610,7 @@ def calc_classes_and_decisions(data_set_records, total_weeks, prob_l):
             _s_hpr = np.mean(_s_s_hpr)
 
             _w_hpr = np.zeros(_l_hpr.shape)
-            _w_hpr = _l_hpr * get_config().LONG_ALLOC_PCT - _s_hpr * get_config().SHORT_ALLOC_PCT
+            _w_hpr = (_l_hpr - get_config().SLIPPAGE) * get_config().LONG_ALLOC_PCT - (_s_hpr - get_config().SLIPPAGE) * get_config().SHORT_ALLOC_PCT
             # if get_config().LONG_LEG:
             #     _w_hpr += _l_hpr
             # if get_config().SHORT_LEG:
