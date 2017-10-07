@@ -39,7 +39,7 @@ stocks =[
     # 'DIS',
 
     # 'XRX',
-    'IBM',
+    # 'IBM',
     #
     # 'WFC',
     # 'INTC',
@@ -132,6 +132,9 @@ stocks =[
     # 'INTU',
     # 'RHI',
     # 'SYK'
+
+    # 'COP'
+    'COP_HPQ'
 ]
 
 for stock in stocks:
@@ -139,7 +142,7 @@ for stock in stocks:
     get_config().reload()
     try:
         # download_px()
-        # preprocess_px()
-        train(net)
+        preprocess_px()
+        # train(net)
     except:
         pass

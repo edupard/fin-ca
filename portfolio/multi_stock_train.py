@@ -104,6 +104,11 @@ def train():
             ds_sz = px_pred_hor.shape[1]
 
             raw_dates = raw_dates[:ds_sz]
+            raw_week_days = np.full(raw_dates.shape, 0, dtype=np.int32)
+            for i in range(raw_dates.shape[0]):
+                date = date_from_timestamp(raw_dates[i])
+                raw_week_days[i] = date.isoweekday()
+
             input = input[:, :ds_sz, :]
             tradeable_mask = tradeable_mask[:,:ds_sz]
             port_mask = port_mask[:, :ds_sz]
@@ -112,12 +117,12 @@ def train():
             labels = (px_pred_hor - px) / px
             batch_num = get_batches_num(ds_sz, get_config().BPTT_STEPS)
 
-            return beg_idx, ds_sz, batch_num, raw_dates, tradeable_mask, port_mask, px, input, labels
+            return beg_idx, ds_sz, batch_num, raw_dates, raw_week_days, tradeable_mask, port_mask, px, input, labels
 
-        tr_beg_data_idx, tr_ds_sz, tr_batch_num, tr_raw_dates, tr_tradeable_mask, tr_port_mask, tr_px, tr_input, tr_labels = get_net_data(get_config().TRAIN_BEG,
+        tr_beg_data_idx, tr_ds_sz, tr_batch_num, tr_raw_dates, tr_week_days, tr_tradeable_mask, tr_port_mask, tr_px, tr_input, tr_labels = get_net_data(get_config().TRAIN_BEG,
                                                                                                  get_config().TRAIN_END)
 
-        tst_beg_data_idx, tst_ds_sz, tst_batch_num, tst_raw_dates, tst_tradeable_mask, tst_port_mask, tst_px, tst_input, tst_labels = get_net_data(
+        tst_beg_data_idx, tst_ds_sz, tst_batch_num, tst_raw_dates, tst_week_days, tst_tradeable_mask, tst_port_mask, tst_px, tst_input, tst_labels = get_net_data(
             get_config().TEST_BEG,
             get_config().TEST_END)
 
@@ -127,7 +132,7 @@ def train():
         def get_batch_slice(input, labels, mask, b):
             b_i = b * get_config().BPTT_STEPS
             e_i = (b + 1) * get_config().BPTT_STEPS
-            return input[:, b_i: e_i, :], labels[:, b_i: e_i], mask[:, b_i: e_i].astype(np.float32)
+            return input[:, b_i: e_i, :], labels[:, b_i: e_i], mask[:, b_i: e_i]
 
         while epoch <= get_config().MAX_EPOCH:
 
@@ -156,7 +161,7 @@ def train():
                         state = net.zero_state(total_tickers)
 
                     _input, _labels, _mask = get_batch_slice(input, labels, mask, b)
-                    state, loss, predictions = net.eval(state, _input, _labels, _mask)
+                    state, loss, predictions = net.eval(state, _input, _labels, _mask.astype(np.float32))
 
 
                     for i in range(predictions.shape[1]):
@@ -303,7 +308,16 @@ def train():
                         state = net.zero_state(total_tickers)
 
                     input, labels, mask = get_batch_slice(tr_input, tr_labels, tr_tradeable_mask, b)
-                    state, loss, predictions = net.fit(state, input, labels, mask)
+
+                    if get_config().FIT_MON_PREDICTION_ONLY:
+                        b_i = b * get_config().BPTT_STEPS
+                        e_i = (b + 1) * get_config().BPTT_STEPS
+                        batch_week_days = tr_week_days[b_i: e_i]
+                        batch_mon_mask = batch_week_days == 1
+                        for i in range(mask.shape[0]):
+                            mask[i,:] = mask[i,:] & batch_mon_mask
+
+                    state, loss, predictions = net.fit(state, input, labels, mask.astype(np.float32))
 
                     curr_progress = progress.print_progress(curr_progress, b, tr_batch_num)
 

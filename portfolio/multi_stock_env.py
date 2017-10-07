@@ -56,7 +56,7 @@ class Env(object):
         # calc tradable_mask, traded_stocks_per_day, trading_day_mask
         tradable_mask = np.all(raw_data > 0.0, axis=2)
         traded_stocks_per_day = tradable_mask[:, :].sum(0)
-        trading_day_mask = traded_stocks_per_day > get_config().MIN_STOCKS_TRADABLE_PER_TRADING_DAY
+        trading_day_mask = traded_stocks_per_day >= get_config().MIN_STOCKS_TRADABLE_PER_TRADING_DAY
         # trading_day_mask = traded_stocks_per_day > 0
 
         self.trading_days = np.sum(trading_day_mask)

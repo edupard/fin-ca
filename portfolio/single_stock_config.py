@@ -17,7 +17,7 @@ TODAY = datetime.datetime.strptime('2017-08-27', '%Y-%m-%d').date()
 
 
 class Config(object):
-    TICKER = 'BAC'
+    TICKER = 'COP_HPQ'
 
     HIST_BEG = YR_90
     HIST_END = TODAY
@@ -46,7 +46,7 @@ class Config(object):
     TEST_END = HIST_END
 
     MODE = Mode.TRAIN
-    EPOCH_WEIGHTS_TO_LOAD = 223
+    EPOCH_WEIGHTS_TO_LOAD = 0
 
     BPTT_STEPS = 20
     PRED_HORIZON = 5
