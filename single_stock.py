@@ -3,9 +3,11 @@ from portfolio.single_stock_train import train
 from portfolio.net_turtle import NetTurtle
 from portfolio.single_stock_config import get_config
 
-net = NetTurtle()
+# net = NetTurtle()
 
 stocks =[
+    'GOOG',
+    # 'GOOGL',
     # 'ABT',
     # 'ARNC',
     # 'HON',
@@ -37,10 +39,8 @@ stocks =[
     # 'TAP',
     # 'NEE',
     # 'DIS',
-
     # 'XRX',
     # 'IBM',
-    #
     # 'WFC',
     # 'INTC',
     # 'TGT',
@@ -59,7 +59,6 @@ stocks =[
     # 'WMT',
     # 'SNA',
     # 'SWK',
-    # 'BF-B',
     # 'AAPL',
     # 'OXY',
     # 'CAG',
@@ -131,17 +130,15 @@ stocks =[
     # 'EOG',
     # 'INTU',
     # 'RHI',
-    # 'SYK'
-
+    # 'SYK',
     # 'COP'
-    'COP_HPQ'
 ]
 
 for stock in stocks:
     get_config().TICKER = stock
     get_config().reload()
     try:
-        # download_px()
+        download_px()
         preprocess_px()
         # train(net)
     except:

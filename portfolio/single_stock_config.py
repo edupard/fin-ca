@@ -13,7 +13,7 @@ YR_07 = datetime.datetime.strptime('2007-01-01', '%Y-%m-%d').date()
 YR_09 = datetime.datetime.strptime('2009-01-01', '%Y-%m-%d').date()
 YR_10 = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
 YR_15 = datetime.datetime.strptime('2015-01-01', '%Y-%m-%d').date()
-TODAY = datetime.datetime.strptime('2017-08-27', '%Y-%m-%d').date()
+TODAY = datetime.datetime.strptime('2017-10-08', '%Y-%m-%d').date()
 
 
 class Config(object):

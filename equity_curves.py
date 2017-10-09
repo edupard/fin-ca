@@ -13,8 +13,8 @@ DDMMMYY_FMT = matplotlib.dates.DateFormatter('%y %b %d')
 YYYY_FMT = matplotlib.dates.DateFormatter('%Y')
 
 curves = [
-    # ('data/eq/eq_70_30_net.csv','%d.%m.%Y', '70x30 rbm net mon-fri','b'),
-    # ('data/eq/eq_70_30_no_net.csv','%d.%m.%Y', '70x30 no net mon-fri','r'),
+    ('data/eq/eq_70_30_net.csv','%d.%m.%Y', '70x30 rbm net mon-fri','b'),
+    ('data/eq/eq_70_30_no_net.csv','%d.%m.%Y', '70x30 no net mon-fri','r'),
 
     # ('data/eq/eq_70_30_net_sl_5_bp.csv','%d.%m.%Y', '70x30 rbm net mon-fri','b'),
     # ('data/eq/eq_70_30_no_net_sl_5_bp.csv','%d.%m.%Y', '70x30 no net mon-fri','r'),
@@ -42,7 +42,8 @@ curves = [
     ('data/eq/eq_snp.csv','%Y-%m-%d', 'snp','m'),
 
 
-    ('data/eq/eq_avg_stocks.csv','%Y-%m-%d', 'avg stocks','c'),
+    # ('data/eq/eq_avg_stocks.csv','%Y-%m-%d', 'avg stocks','c'),
+    # ('data/eq/eq_2007_tod_ms.csv','%Y-%m-%d', 'avg stocks','c'),
           ]
 
 fig = plt.figure()

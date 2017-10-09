@@ -13,8 +13,7 @@ YR_07 = datetime.datetime.strptime('2007-01-01', '%Y-%m-%d').date()
 YR_10 = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
 YR_15 = datetime.datetime.strptime('2015-01-01', '%Y-%m-%d').date()
 
-ALMOST_END = datetime.datetime.strptime('2017-08-01', '%Y-%m-%d').date()
-TODAY = datetime.datetime.strptime('2017-08-27', '%Y-%m-%d').date()
+TODAY = datetime.datetime.strptime('2017-10-08', '%Y-%m-%d').date()
 
 
 class Config(object):
@@ -42,8 +41,8 @@ class Config(object):
     # LSTM_LAYERS_SIZE = [5, 5, 5]
     FC_LAYERS_SIZE = [30]
 
-    TRAIN_BEG = YR_00
-    TRAIN_END = ALMOST_END
+    TRAIN_BEG = YR_07
+    TRAIN_END = TODAY
     # TRAIN_END = YR_07
 
     TEST_BEG = TRAIN_END
@@ -51,21 +50,27 @@ class Config(object):
 
     # MODE = Mode.TEST
     # EPOCH_WEIGHTS_TO_LOAD = 1000
-    MODE = Mode.TEST
-    EPOCH_WEIGHTS_TO_LOAD = 1000
-    MAX_EPOCH = 1000
+    MODE = Mode.TRAIN
+    EPOCH_WEIGHTS_TO_LOAD = 0
+    MAX_EPOCH = 600
 
     BPTT_STEPS = 1000
-    PRED_HORIZON = 4
-    REBALANCE_MON_FRI = True
-    REBALANCE_FREQ = 4
-    FIT_MON_PREDICTION_ONLY = True
+    PRED_HORIZON = 5
+    REBALANCE_FRI = True
+    REBALANCE_FREQ = 5
+    FIT_FRI_PREDICTION_ONLY = True
 
     CAPM = False
     CAPM_USE_NET_PREDICTIONS = True
     COVARIANCE_LENGTH = 60
 
+    TEST = False
+
     def __init__(self):
+        self.reload()
+
+
+    def reload(self):
         if self.TICKER == 'SNP':
             self.WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/embeddings'
             self.TRAIN_STAT_PATH = '%s/train_stat.csv' % self.WEIGHTS_FOLDER_PATH
@@ -96,6 +101,7 @@ class Config(object):
             self.TEST_EQ_PATH = 'data/stocks/%s/eq/test/eq.csv' % self.TICKER
 
             self.MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 1
+
 
 
 _config = Config()

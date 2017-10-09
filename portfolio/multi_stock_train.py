@@ -52,14 +52,14 @@ def plot_eq(name, BEG, END, dt, capital):
     sharpe = get_sharpe_ratio(rets, years)
     y_avg = (capital[-1] - capital[0]) / years
     print('%s dd: %.2f%% y_avg: %.2f%% sharpe: %.2f' % (name, dd * 100, y_avg * 100, sharpe))
-    return plot_equity_curve("%s equity curve" % name, dt, capital[:])
+    return plot_equity_curve("%s equity curve" % name, dt, capital[:]), dd, sharpe, y_avg
 
 
-def train():
+def train(net):
     create_folders()
 
     env = Env()
-    net = NetShiva()
+    # net = NetShiva()
 
     if not os.path.exists(get_config().TRAIN_STAT_PATH):
         with open(get_config().TRAIN_STAT_PATH, 'a', newline='') as f:
@@ -67,8 +67,14 @@ def train():
             writer.writerow(
                 (
                     'epoch',
-                    'train loss',
-                    'test loss',
+                    'tr loss',
+                    'tr dd',
+                    'tr sharpe',
+                    'tr y avg',
+                    'tst loss',
+                    'tst dd',
+                    'tst sharpe',
+                    'tst y avg'
                 ))
 
     total_tickers = len(env.tickers)
@@ -121,13 +127,16 @@ def train():
 
         tr_beg_data_idx, tr_ds_sz, tr_batch_num, tr_raw_dates, tr_week_days, tr_tradeable_mask, tr_port_mask, tr_px, tr_input, tr_labels = get_net_data(get_config().TRAIN_BEG,
                                                                                                  get_config().TRAIN_END)
-
-        tst_beg_data_idx, tst_ds_sz, tst_batch_num, tst_raw_dates, tst_week_days, tst_tradeable_mask, tst_port_mask, tst_px, tst_input, tst_labels = get_net_data(
-            get_config().TEST_BEG,
-            get_config().TEST_END)
-
         tr_eq = np.zeros((tr_ds_sz))
-        tst_eq = np.zeros((tst_ds_sz))
+
+        if get_config().TEST:
+            tst_beg_data_idx, tst_ds_sz, tst_batch_num, tst_raw_dates, tst_week_days, tst_tradeable_mask, tst_port_mask, tst_px, tst_input, tst_labels = get_net_data(
+                get_config().TEST_BEG,
+                get_config().TEST_END)
+            tst_eq = np.zeros((tst_ds_sz))
+
+
+
 
         def get_batch_slice(input, labels, mask, b):
             b_i = b * get_config().BPTT_STEPS
@@ -172,8 +181,8 @@ def train():
                         date = datetime.datetime.fromtimestamp(raw_dates[data_idx]).date()
                         open_pos = False
                         close_pos = False
-                        if get_config().REBALANCE_MON_FRI:
-                            if date.isoweekday() == 1:
+                        if get_config().REBALANCE_FRI:
+                            if date.isoweekday() == 5:
                                 open_pos = True
                             if date.isoweekday() == 5:
                                 close_pos = True
@@ -244,57 +253,74 @@ def train():
             tr_avg_loss = eval()
             print("Train loss: %.4f%%" % (tr_avg_loss * 100))
 
-            print("Eval %d epoch on train set..." % epoch)
-            batch_num = tst_batch_num
-            input = tst_input
-            labels = tst_labels
-            px = tst_px
-            mask = tst_tradeable_mask
-            port_mask = tst_port_mask
-            eq = tst_eq
-            beg_data_idx = tst_beg_data_idx
-            raw_dates = tst_raw_dates
-            state = None
+            if get_config().TEST:
+                print("Eval %d epoch on test set..." % epoch)
+                batch_num = tst_batch_num
+                input = tst_input
+                labels = tst_labels
+                px = tst_px
+                mask = tst_tradeable_mask
+                port_mask = tst_port_mask
+                eq = tst_eq
+                beg_data_idx = tst_beg_data_idx
+                raw_dates = tst_raw_dates
+                state = None
 
-            tst_avg_loss = eval()
-            print("Test loss: %.4f%%" % (tst_avg_loss * 100))
+                tst_avg_loss = eval()
+                print("Test loss: %.4f%%" % (tst_avg_loss * 100))
 
             if not is_train():
                 dt = build_time_axis(tr_raw_dates)
                 plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, dt, tr_eq)
 
-                dt = build_time_axis(tst_raw_dates)
-                plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, dt, tst_eq)
+                if get_config().TEST:
+                    dt = build_time_axis(tst_raw_dates)
+                    plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, dt, tst_eq)
 
                 show_plots()
                 break
 
             if is_train() and epoch <= get_config().MAX_EPOCH:
+
+
+                # plot and save graphs
+                dt = build_time_axis(tr_raw_dates)
+                fig, tr_dd, tr_sharpe, tr_y_avg = plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, dt, tr_eq)
+                fig.savefig('%s/%04d.png' % (get_config().TRAIN_FIG_PATH, epoch))
+                plt.close(fig)
+
+                if get_config().TEST:
+                    dt = build_time_axis(tst_raw_dates)
+                    fig, tst_dd, tst_sharpe, tst_y_avg = plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, dt, tst_eq)
+                    fig.savefig('%s/%04d.png' % (get_config().TEST_FIG_PATH, epoch))
+                    plt.close(fig)
+                else:
+                    tst_avg_loss = 0
+                    tst_dd = 0
+                    tst_sharpe = 0
+                    tst_y_avg = 0
+
                 writer.writerow(
                     (
                         epoch,
                         tr_avg_loss,
-                        tst_avg_loss
+                        tr_dd,
+                        tr_sharpe,
+                        tr_y_avg,
+                        tst_avg_loss,
+                        tst_dd,
+                        tst_sharpe,
+                        tst_y_avg,
                     ))
 
                 f.flush()
 
-                # plot and save graphs
-                dt = build_time_axis(tr_raw_dates)
-                fig = plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, dt, tr_eq)
-                fig.savefig('%s/%04d.png' % (get_config().TRAIN_FIG_PATH, epoch))
-                plt.close(fig)
                 if epoch == get_config().MAX_EPOCH:
                     tr_df = pd.DataFrame({'date': dt, 'capital': tr_eq[:]})
                     tr_df.to_csv(get_config().TRAIN_EQ_PATH, index=False)
-
-                dt = build_time_axis(tst_raw_dates)
-                fig = plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, dt, tst_eq)
-                fig.savefig('%s/%04d.png' % (get_config().TEST_FIG_PATH, epoch))
-                plt.close(fig)
-                if epoch == get_config().MAX_EPOCH:
-                    tr_df = pd.DataFrame({'date': dt, 'capital': tst_eq[:]})
-                    tr_df.to_csv(get_config().TEST_EQ_PATH, index=False)
+                    if get_config().TEST:
+                        tst_df = pd.DataFrame({'date': dt, 'capital': tst_eq[:]})
+                        tst_df.to_csv(get_config().TEST_EQ_PATH, index=False)
 
                 epoch += 1
                 if epoch > get_config().MAX_EPOCH:
@@ -309,11 +335,11 @@ def train():
 
                     input, labels, mask = get_batch_slice(tr_input, tr_labels, tr_tradeable_mask, b)
 
-                    if get_config().FIT_MON_PREDICTION_ONLY:
+                    if get_config().FIT_FRI_PREDICTION_ONLY:
                         b_i = b * get_config().BPTT_STEPS
                         e_i = (b + 1) * get_config().BPTT_STEPS
                         batch_week_days = tr_week_days[b_i: e_i]
-                        batch_mon_mask = batch_week_days == 1
+                        batch_mon_mask = batch_week_days == 5
                         for i in range(mask.shape[0]):
                             mask[i,:] = mask[i,:] & batch_mon_mask
 
