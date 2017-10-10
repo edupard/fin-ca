@@ -164,6 +164,17 @@ class Env(object):
                 end_idx = i
         return beg_idx, end_idx
 
+    def get_data_idx(self, END):
+        END_TS = self.get_timestamp(END)
+        end_idx = None
+        for i in range(self.trading_days):
+            ts = self.raw_dt[i]
+            if ts <= END_TS:
+                end_idx = i
+            else:
+                break
+        return end_idx
+
 
     def get_input(self, BEG_DATA_IDX, END_DATA_IDX):
         return self.input[:, BEG_DATA_IDX: END_DATA_IDX + 1, :]

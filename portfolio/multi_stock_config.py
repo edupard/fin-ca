@@ -66,42 +66,34 @@ class Config(object):
 
     TEST = False
 
+    PREDICTION_MODE = False
+
     def __init__(self):
         self.reload()
 
-
     def reload(self):
-        if self.TICKER == 'SNP':
-            self.WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/embeddings'
-            self.TRAIN_STAT_PATH = '%s/train_stat.csv' % self.WEIGHTS_FOLDER_PATH
-            self.WEIGHTS_PATH = '%s/weights' % self.WEIGHTS_FOLDER_PATH
+        self.WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/%s' % self.TICKER
+        self.TRAIN_STAT_PATH = '%s/train_stat.csv' % self.WEIGHTS_FOLDER_PATH
+        self.WEIGHTS_PATH = '%s/weights' % self.WEIGHTS_FOLDER_PATH
 
-            self.DATA_FOLDER_PATH = 'data/snp'
-            self.DATA_PATH = '%s/snp_px.csv' % self.DATA_FOLDER_PATH
-            self.DATA_NPZ_PATH = '%s/snp_px.npz' % self.DATA_FOLDER_PATH
-
-            self.TRAIN_FIG_PATH = 'data/stocks/embeddings/eq/train'
-            self.TEST_FIG_PATH = 'data/stocks/embeddings/eq/test'
-
-            self.MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 30
-
+        if self.PREDICTION_MODE:
+            self.DATA_FOLDER_PATH = 'data/stocks/temp/%s' % self.TICKER
         else:
-            self.WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/%s' % self.TICKER
-            self.TRAIN_STAT_PATH = '%s/train_stat.csv' % self.WEIGHTS_FOLDER_PATH
-            self.WEIGHTS_PATH = '%s/weights' % self.WEIGHTS_FOLDER_PATH
-
             self.DATA_FOLDER_PATH = 'data/stocks/%s' % self.TICKER
-            self.DATA_PATH = '%s/%s.csv' % (self.DATA_FOLDER_PATH, self.TICKER)
-            self.DATA_NPZ_PATH = '%s/%s.npz' % (self.DATA_FOLDER_PATH, self.TICKER)
 
-            self.TRAIN_FIG_PATH = 'data/stocks/%s/eq/train' % self.TICKER
-            self.TEST_FIG_PATH = 'data/stocks/%s/eq/test' % self.TICKER
+        self.DATA_PATH = '%s/%s.csv' % (self.DATA_FOLDER_PATH, self.TICKER)
+        self.DATA_NPZ_PATH = '%s/%s.npz' % (self.DATA_FOLDER_PATH, self.TICKER)
 
-            self.TRAIN_EQ_PATH = 'data/stocks/%s/eq/train/eq.csv' % self.TICKER
-            self.TEST_EQ_PATH = 'data/stocks/%s/eq/test/eq.csv' % self.TICKER
+        self.TRAIN_FIG_PATH = 'data/stocks/%s/eq/train' % self.TICKER
+        self.TEST_FIG_PATH = 'data/stocks/%s/eq/test' % self.TICKER
 
+        self.TRAIN_EQ_PATH = 'data/stocks/%s/eq/train/eq.csv' % self.TICKER
+        self.TEST_EQ_PATH = 'data/stocks/%s/eq/test/eq.csv' % self.TICKER
+
+        if self.TICKER == 'SNP_IND':
+            self.MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 30
+        else:
             self.MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 1
-
 
 
 _config = Config()

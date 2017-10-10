@@ -8,9 +8,6 @@ import os
 
 from tiingo import get_historical_data
 
-tickers = []
-
-
 class PayloadType(Enum):
     DATA = 0
     TASK_COMPLETED = 1
