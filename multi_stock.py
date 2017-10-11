@@ -1,12 +1,14 @@
 from portfolio.multi_stock_train import train
 from portfolio.multi_stock_config import get_config
 from portfolio.net_shiva import NetShiva
+from portfolio.snp import get_snp_tickers
 import numpy as np
 import pandas as pd
 import datetime
+from download_utils import download_data, load_npz_data, preprocess_data
+import os
 
-
-stocks =[
+stocks = [
     'ABT',
     'ARNC',
     'HON',
@@ -133,51 +135,30 @@ stocks =[
     'COP'
 ]
 
-# net = NetShiva()
-# for stock in stocks:
-#     get_config().TICKER = stock
-#     get_config().reload()
-#     train(net)
+stocks = get_snp_tickers()
 
+def create_folders():
+    if not os.path.exists(get_config().DATA_FOLDER_PATH):
+        os.makedirs(get_config().DATA_FOLDER_PATH)
 
-def date_to_idx(date):
-    if get_config().TRAIN_BEG <= date <= get_config().TRAIN_END:
-        return (date - get_config().TRAIN_BEG).days
-    return None
-
-
-def idx_to_date(idx):
-    return get_config().TRAIN_BEG + datetime.timedelta(days=idx)
-
-
-days = (get_config().TRAIN_END - get_config().TRAIN_BEG).days
-data = np.ones((len(stocks), days))
-
-stk_idx = 0
+net = NetShiva()
 for stock in stocks:
+    print("Processing %s stock" % stock)
     get_config().TICKER = stock
     get_config().reload()
 
-    df = pd.read_csv(get_config().TRAIN_EQ_PATH)
-    df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d').dt.date
+    _tickers = [stock]
+    create_folders()
+    download_data(_tickers,
+                  get_config().DATA_PATH,
+                  get_config().HIST_BEG,
+                  get_config().HIST_END)
+    preprocess_data(_tickers,
+                    get_config().DATA_PATH,
+                    get_config().HIST_BEG,
+                    get_config().HIST_END,
+                    get_config().DATA_NPZ_PATH,
+                    get_config().DATA_FEATURES)
+    train(net)
 
-    idx_from = date_to_idx(get_config().TRAIN_BEG)
-    capital = 1.0
-    for index, row in df.iterrows():
-        date = row['date']
-        idx_to = date_to_idx(date)
-        data[stk_idx, idx_from:idx_to] = capital
-        capital = row['capital']
-        idx_from = idx_to
-    idx_to = date_to_idx(get_config().TRAIN_END)
-    data[stk_idx, idx_from:idx_to] = capital
 
-    stk_idx += 1
-
-capital = np.mean(data, axis = 0)
-dt = []
-for d in range(days):
-    dt.append(get_config().TRAIN_BEG + datetime.timedelta(days=d))
-
-df = pd.DataFrame({'date': dt, 'capital': capital})
-df.to_csv('data/eq/eq_2007_tod_ms.csv', index=False)

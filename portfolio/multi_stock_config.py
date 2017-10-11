@@ -6,7 +6,7 @@ class Mode(Enum):
     TRAIN = 0
     TEST = 1
 
-
+YR_80 = datetime.datetime.strptime('1980-01-01', '%Y-%m-%d').date()
 YR_90 = datetime.datetime.strptime('1990-01-01', '%Y-%m-%d').date()
 YR_00 = datetime.datetime.strptime('2000-01-01', '%Y-%m-%d').date()
 YR_07 = datetime.datetime.strptime('2007-01-01', '%Y-%m-%d').date()
@@ -19,7 +19,7 @@ TODAY = datetime.datetime.strptime('2017-10-08', '%Y-%m-%d').date()
 class Config(object):
     TICKER = 'HPQ'
 
-    HIST_BEG = YR_90
+    HIST_BEG = YR_80
     HIST_END = TODAY
 
     DATA_FEATURES = ['o', 'h', 'l', 'c', 'v', 'a_o', 'a_h', 'a_l', 'a_c', 'a_v']
@@ -41,12 +41,15 @@ class Config(object):
     # LSTM_LAYERS_SIZE = [5, 5, 5]
     FC_LAYERS_SIZE = [30]
 
+    # TRAIN_BEG = HIST_BEG
     TRAIN_BEG = YR_07
     TRAIN_END = TODAY
     # TRAIN_END = YR_07
 
     TEST_BEG = TRAIN_END
     TEST_END = HIST_END
+
+    TEST = False
 
     # MODE = Mode.TEST
     # EPOCH_WEIGHTS_TO_LOAD = 1000
@@ -64,12 +67,15 @@ class Config(object):
     CAPM_USE_NET_PREDICTIONS = True
     COVARIANCE_LENGTH = 60
 
-    TEST = False
+
 
     PREDICTION_MODE = False
 
     def __init__(self):
         self.reload()
+
+    def is_snp_index(self):
+        return self.TICKER == 'SNP_IND'
 
     def reload(self):
         self.WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/%s' % self.TICKER
@@ -90,7 +96,7 @@ class Config(object):
         self.TRAIN_EQ_PATH = 'data/stocks/%s/eq/train/eq.csv' % self.TICKER
         self.TEST_EQ_PATH = 'data/stocks/%s/eq/test/eq.csv' % self.TICKER
 
-        if self.TICKER == 'SNP_IND':
+        if self.is_snp_index():
             self.MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 30
         else:
             self.MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 1

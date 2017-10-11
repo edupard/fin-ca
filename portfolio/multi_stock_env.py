@@ -189,7 +189,10 @@ class Env(object):
         return self.tradable_mask[:,BEG_DATA_IDX: END_DATA_IDX + 1]
 
     def get_portfolio_mask(self, BEG_DATA_IDX, END_DATA_IDX):
-        return self.tradable_mask[:, BEG_DATA_IDX: END_DATA_IDX + 1] & self.snp_mask[:, BEG_DATA_IDX: END_DATA_IDX + 1]
+        if get_config().is_snp_index():
+            return self.tradable_mask[:, BEG_DATA_IDX: END_DATA_IDX + 1] & self.snp_mask[:, BEG_DATA_IDX: END_DATA_IDX + 1]
+        else:
+            return self.get_tradeable_mask(BEG_DATA_IDX, END_DATA_IDX)
 
     def get_exp_and_cov(self, mask, BEG_DATA_IDX, END_DATA_IDX):
         r = self.input[mask, BEG_DATA_IDX : END_DATA_IDX + 1, 1]
