@@ -13,7 +13,7 @@ DDMMMYY_FMT = matplotlib.dates.DateFormatter('%y %b %d')
 YYYY_FMT = matplotlib.dates.DateFormatter('%Y')
 
 curves = [
-    ('data/eq/eq_70_30_net.csv','%d.%m.%Y', '70x30 rbm net mon-fri','b'),
+    # ('data/eq/eq_70_30_net.csv','%d.%m.%Y', '70x30 rbm net mon-fri','b'),
     ('data/eq/eq_70_30_no_net.csv','%d.%m.%Y', '70x30 no net mon-fri','r'),
 
     # ('data/eq/eq_70_30_net_sl_5_bp.csv','%d.%m.%Y', '70x30 rbm net mon-fri','b'),
@@ -39,12 +39,32 @@ curves = [
     # ('data/eq/eq_50_50_long_short_softmax_sel_23.csv','%d.%m.%Y', '50x50 long short softmax sel 23','c'),
     # ('data/eq/eq_70_30_long_short_softmax_sel_23.csv','%d.%m.%Y', '70x30 long short softmax sel 23','k'),
 
+    ('data/eq/50_25_70.csv', '%Y-%m-%d', '25 70 vs 30', 'k'),
+    ('data/eq/100_23_70.csv', '%Y-%m-%d', '23 70 vs 30 pure net', 'g'),
+    ('data/eq/0_23_70.csv', '%Y-%m-%d', '23 70 vs 30 pure decline', 'k'),
+
     ('data/eq/eq_snp.csv','%Y-%m-%d', 'snp','m'),
 
 
     # ('data/eq/eq_avg_stocks.csv','%Y-%m-%d', 'avg stocks','c'),
     # ('data/eq/eq_2007_tod_ms.csv','%Y-%m-%d', 'avg stocks','c'),
+    # ('data/eq/o.csv','%Y-%m-%d', '*','k'),
           ]
+
+# curves = []
+#
+# NET_FACTOR_GRID = [0.5]
+# SELECTION_GRID = [35]
+# # SELECTION_GRID = [5,15,25,35]
+# LONG_PCT_GRID = [0.5,0.6,0.7,0.8]
+#
+# for NET_FACTOR in NET_FACTOR_GRID:
+#     for SELECTION in SELECTION_GRID:
+#         for LONG_PCT in LONG_PCT_GRID:
+#             SHORT_PCT = 1 - LONG_PCT
+#             csv_path = 'data/eq/%.0f_%d_%.0f.csv' % (NET_FACTOR * 100, SELECTION, LONG_PCT * 100)
+#             curves.append((csv_path, '%Y-%m-%d', '%d %.0f vs %.0f' % (SELECTION, LONG_PCT * 100, SHORT_PCT * 100), 'c'))
+
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
@@ -65,7 +85,8 @@ for path,fmt,name,clr in curves:
     sharpe = get_sharpe_ratio(rets, years)
     y_avg = (capital[-1] - capital[0]) / years
     print('%s dd: %.2f%% y_avg: %.2f%% sharpe: %.2f' % (name, dd * 100, y_avg * 100, sharpe))
-    line, = ax.plot_date(df['date'], capital, color=clr, fmt='-', label=name)
+    line, = ax.plot_date(df['date'], capital, fmt='-', label=name)
+    # line, = ax.plot_date(df['date'], capital, color=clr, fmt='-', label=name)
     handles.append(line)
 
 plt.legend(handles=handles)

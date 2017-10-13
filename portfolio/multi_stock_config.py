@@ -53,8 +53,8 @@ class Config(object):
 
     # MODE = Mode.TEST
     # EPOCH_WEIGHTS_TO_LOAD = 1000
-    MODE = Mode.TRAIN
-    EPOCH_WEIGHTS_TO_LOAD = 0
+    MODE = Mode.TEST
+    EPOCH_WEIGHTS_TO_LOAD = 600
     MAX_EPOCH = 600
 
     BPTT_STEPS = 1000
@@ -62,12 +62,13 @@ class Config(object):
     REBALANCE_FRI = True
     REBALANCE_FREQ = 5
     FIT_FRI_PREDICTION_ONLY = True
+    RESET_HIDDEN_STATE_FREQ = 0
 
     CAPM = False
     CAPM_USE_NET_PREDICTIONS = True
     COVARIANCE_LENGTH = 60
 
-
+    HIDE_PLOTS = False
 
     PREDICTION_MODE = False
 
@@ -76,6 +77,9 @@ class Config(object):
 
     def is_snp_index(self):
         return self.TICKER == 'SNP_IND'
+
+    def is_all_stocks_index(self):
+        return self.TICKER == 'ALL_STOCKS'
 
     def reload(self):
         self.WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/%s' % self.TICKER
@@ -96,14 +100,15 @@ class Config(object):
         self.TRAIN_EQ_PATH = 'data/stocks/%s/eq/train/eq.csv' % self.TICKER
         self.TEST_EQ_PATH = 'data/stocks/%s/eq/test/eq.csv' % self.TICKER
 
-        if self.is_snp_index():
+        self.TRAIN_PRED_PATH = ('data/stocks/%s/train_prediction' % self.TICKER if self.RESET_HIDDEN_STATE_FREQ == 0 else 'data/stocks/%s/train_prediction_%d' % (self.TICKER, self.RESET_HIDDEN_STATE_FREQ)) + '.csv'
+        self.TEST_PRED_PATH = ('data/stocks/%s/test_prediction' % self.TICKER if self.RESET_HIDDEN_STATE_FREQ == 0 else 'data/stocks/%s/test_prediction_%d' % (self.TICKER, self.RESET_HIDDEN_STATE_FREQ)) + '.csv'
+
+        if self.is_snp_index() or self.is_all_stocks_index():
             self.MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 30
         else:
             self.MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 1
 
-
 _config = Config()
-
 
 def get_config() -> Config:
     return _config

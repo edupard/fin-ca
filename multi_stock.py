@@ -9,7 +9,6 @@ from download_utils import download_data, load_npz_data, preprocess_data
 import os
 
 stocks = [
-    'ABT',
     'ARNC',
     'HON',
     'SHW',
@@ -135,7 +134,11 @@ stocks = [
     'COP'
 ]
 
-stocks = get_snp_tickers()
+# stocks = get_snp_tickers()
+
+# 2015-10-30
+stocks = ['HPQ']
+# stocks = ['BAC']
 
 def create_folders():
     if not os.path.exists(get_config().DATA_FOLDER_PATH):
@@ -148,17 +151,17 @@ for stock in stocks:
     get_config().reload()
 
     _tickers = [stock]
-    create_folders()
-    download_data(_tickers,
-                  get_config().DATA_PATH,
-                  get_config().HIST_BEG,
-                  get_config().HIST_END)
-    preprocess_data(_tickers,
-                    get_config().DATA_PATH,
-                    get_config().HIST_BEG,
-                    get_config().HIST_END,
-                    get_config().DATA_NPZ_PATH,
-                    get_config().DATA_FEATURES)
+    # create_folders()
+    # download_data(_tickers,
+    #               get_config().DATA_PATH,
+    #               get_config().HIST_BEG,
+    #               get_config().HIST_END)
+    # preprocess_data(_tickers,
+    #                 get_config().DATA_PATH,
+    #                 get_config().HIST_BEG,
+    #                 get_config().HIST_END,
+    #                 get_config().DATA_NPZ_PATH,
+    #                 get_config().DATA_FEATURES)
     train(net)
 
 

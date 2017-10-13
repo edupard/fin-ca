@@ -45,6 +45,7 @@ def build_time_axis(raw_dates):
         dt.append(date_from_timestamp(raw_dt))
     return dt
 
+
 def plot_eq(name, BEG, END, dt, capital):
     years = (END - BEG).days / 365
     dd = get_draw_down(capital, False)
@@ -116,7 +117,7 @@ def train(net):
                 raw_week_days[i] = date.isoweekday()
 
             input = input[:, :ds_sz, :]
-            tradeable_mask = tradeable_mask[:,:ds_sz]
+            tradeable_mask = tradeable_mask[:, :ds_sz]
             port_mask = port_mask[:, :ds_sz]
             px = px[:, :ds_sz]
 
@@ -125,28 +126,27 @@ def train(net):
 
             return beg_idx, ds_sz, batch_num, raw_dates, raw_week_days, tradeable_mask, port_mask, px, input, labels
 
-        tr_beg_data_idx, tr_ds_sz, tr_batch_num, tr_raw_dates, tr_week_days, tr_tradeable_mask, tr_port_mask, tr_px, tr_input, tr_labels = get_net_data(get_config().TRAIN_BEG,
-                                                                                                 get_config().TRAIN_END)
+        tr_beg_data_idx, tr_ds_sz, tr_batch_num, tr_raw_dates, tr_week_days, tr_tradeable_mask, tr_port_mask, tr_px, tr_input, tr_labels = get_net_data(
+            get_config().TRAIN_BEG,
+            get_config().TRAIN_END)
         tr_eq = np.zeros((tr_ds_sz))
+        tr_pred = np.zeros((total_tickers, tr_ds_sz))
 
         if get_config().TEST:
             tst_beg_data_idx, tst_ds_sz, tst_batch_num, tst_raw_dates, tst_week_days, tst_tradeable_mask, tst_port_mask, tst_px, tst_input, tst_labels = get_net_data(
                 get_config().TEST_BEG,
                 get_config().TEST_END)
             tst_eq = np.zeros((tst_ds_sz))
+            tst_pred = np.zeros((total_tickers, tst_ds_sz))
 
-
-
-
-        def get_batch_slice(input, labels, mask, b):
-            b_i = b * get_config().BPTT_STEPS
-            e_i = (b + 1) * get_config().BPTT_STEPS
-            return input[:, b_i: e_i, :], labels[:, b_i: e_i], mask[:, b_i: e_i]
+        def get_batch_range(b):
+            return b * get_config().BPTT_STEPS, (b + 1) * get_config().BPTT_STEPS
 
         while epoch <= get_config().MAX_EPOCH:
 
             print("Eval %d epoch on train set..." % epoch)
             batch_num = tr_batch_num
+            ds_size = tr_ds_sz
             input = tr_input
             labels = tr_labels
             px = tr_px
@@ -155,10 +155,104 @@ def train(net):
             eq = tr_eq
             beg_data_idx = tr_beg_data_idx
             raw_dates = tr_raw_dates
+            pred_hist = tr_pred
             state = None
 
+            def eval_with_state_reset():
+                nonlocal raw_dates, beg_data_idx, ds_size, batch_num, input, labels, px, mask, port_mask, eq, pred_hist, state
+                curr_progress = 0
+                cash = 1
+                pos = np.zeros((total_tickers))
+                pos_px = np.zeros((total_tickers))
+                losses = np.zeros((batch_num))
+                for i in range(ds_size):
+                    state = net.zero_state(total_tickers)
+                    b_b_i = max(0, i + 1 - get_config().RESET_HIDDEN_STATE_FREQ)
+                    b_e_i = i + 1
+                    _input = input[:, b_b_i: b_e_i, :]
+                    _labels = labels[:, b_b_i: b_e_i]
+                    _mask = mask[:, b_b_i: b_e_i]
+                    state, loss, predictions = net.eval(state, _input, _labels, _mask.astype(np.float32))
+                    pred_hist[:, i] = predictions[:, -1, 0]
+
+                    data_idx = i
+                    curr_px = px[:, data_idx]
+                    global_data_idx = beg_data_idx + data_idx
+
+                    date = datetime.datetime.fromtimestamp(raw_dates[data_idx]).date()
+
+                    open_pos = False
+                    close_pos = False
+                    if get_config().REBALANCE_FRI:
+                        if date.isoweekday() == 5:
+                            open_pos = True
+                        if date.isoweekday() == 5:
+                            close_pos = True
+                    else:
+                        if data_idx % get_config().REBALANCE_FREQ == 0:
+                            close_pos = True
+                            open_pos = True
+
+                    if close_pos:
+                        rpl = np.sum(pos * (curr_px - pos_px))
+                        cash += rpl
+                        pos[:] = 0
+                    if open_pos:
+                        pos_px = curr_px
+                        pos_mask = port_mask[:, data_idx]
+                        num_stks = np.sum(pos_mask)
+                        if get_config().CAPM:
+                            exp, cov = env.get_exp_and_cov(pos_mask,
+                                                           global_data_idx - get_config().COVARIANCE_LENGTH + 1,
+                                                           global_data_idx)
+                            exp = get_config().REBALANCE_FREQ * exp
+                            cov = get_config().REBALANCE_FREQ * get_config().REBALANCE_FREQ * cov
+                            if get_config().CAPM_USE_NET_PREDICTIONS:
+                                exp = predictions[:, i, 0][pos_mask]
+
+                            capm = Capm(num_stks)
+                            capm.init()
+
+                            best_sharpe = None
+                            best_weights = None
+                            best_constriant = None
+                            while i <= 10000:
+                                w, sharpe, constraint = capm.get_params(exp, cov)
+                                # print("Iteration: %d Sharpe: %.2f Constraint: %.6f" % (i, sharpe, constraint))
+                                if w is None:
+                                    break
+                                if best_sharpe is None or sharpe >= best_sharpe:
+                                    best_weights = w
+                                    best_sharpe = sharpe
+                                    best_constriant = constraint
+                                capm.fit(exp, cov)
+                                capm.rescale_weights()
+
+                                i += 1
+                            date = datetime.datetime.fromtimestamp(raw_dates[data_idx]).date()
+                            print("Date: %s sharpe: %.2f constraint: %.6f" %
+                                  (date.strftime('%Y-%m-%d'),
+                                   best_sharpe,
+                                   best_constriant)
+                                  )
+
+                            pos[pos_mask] = best_weights / curr_px[pos_mask]
+                        else:
+                            pos[pos_mask] = 1 / num_stks / curr_px[pos_mask] * np.sign(predictions[pos_mask, -1, 0])
+
+                    urpl = np.sum(pos * (curr_px - pos_px))
+                    nlv = cash + urpl
+
+                    eq[data_idx] = nlv
+
+                    curr_progress = progress.print_progress(curr_progress, i, ds_size)
+
+                progress.print_progess_end()
+                avg_loss = np.mean(np.sqrt(losses))
+                return avg_loss
+
             def eval():
-                nonlocal raw_dates, beg_data_idx, batch_num, input, labels, px, mask, port_mask, eq, state
+                nonlocal raw_dates, beg_data_idx, ds_size, batch_num, input, labels, px, mask, port_mask, eq, pred_hist, state
                 curr_progress = 0
                 cash = 1
                 pos = np.zeros((total_tickers))
@@ -169,9 +263,13 @@ def train(net):
                     if state is None:
                         state = net.zero_state(total_tickers)
 
-                    _input, _labels, _mask = get_batch_slice(input, labels, mask, b)
-                    state, loss, predictions = net.eval(state, _input, _labels, _mask.astype(np.float32))
+                    b_b_i, b_e_i = get_batch_range(b)
+                    _input = input[:, b_b_i: b_e_i, :]
+                    _labels = labels[:, b_b_i: b_e_i]
+                    _mask = mask[:, b_b_i: b_e_i]
 
+                    state, loss, predictions = net.eval(state, _input, _labels, _mask.astype(np.float32))
+                    pred_hist[:, b_b_i: b_e_i] = predictions[:, :, 0]
 
                     for i in range(predictions.shape[1]):
                         data_idx = b * get_config().BPTT_STEPS + i
@@ -179,6 +277,7 @@ def train(net):
                         global_data_idx = beg_data_idx + data_idx
 
                         date = datetime.datetime.fromtimestamp(raw_dates[data_idx]).date()
+
                         open_pos = False
                         close_pos = False
                         if get_config().REBALANCE_FRI:
@@ -250,12 +349,17 @@ def train(net):
                 avg_loss = np.mean(np.sqrt(losses))
                 return avg_loss
 
-            tr_avg_loss = eval()
+            if get_config().RESET_HIDDEN_STATE_FREQ == 0:
+                tr_avg_loss = eval()
+            else:
+                tr_avg_loss = eval_with_state_reset()
+
             print("Train loss: %.4f%%" % (tr_avg_loss * 100))
 
             if get_config().TEST:
                 print("Eval %d epoch on test set..." % epoch)
                 batch_num = tst_batch_num
+                ds_size = tr_ds_sz
                 input = tst_input
                 labels = tst_labels
                 px = tst_px
@@ -264,34 +368,55 @@ def train(net):
                 eq = tst_eq
                 beg_data_idx = tst_beg_data_idx
                 raw_dates = tst_raw_dates
+                pred_hist = tst_pred
                 state = None
 
-                tst_avg_loss = eval()
+                if get_config().RESET_HIDDEN_STATE_FREQ == 0:
+                    tst_avg_loss = eval()
+                else:
+                    tst_avg_loss = eval_with_state_reset()
+
                 print("Test loss: %.4f%%" % (tst_avg_loss * 100))
 
             if not is_train():
                 dt = build_time_axis(tr_raw_dates)
-                plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, dt, tr_eq)
+
+                if not get_config().HIDE_PLOTS:
+                    plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, dt, tr_eq)
+
+                result = pd.DataFrame(columns=('date', 'ticker', 'prediction'))
+                for i in range(tr_raw_dates.shape[0]):
+                    date = dt[i]
+                    for j in range(total_tickers):
+                        ticker = env._idx_to_ticker(j)
+                        prediction = tr_pred[j, i]
+
+                        row = [date, ticker, prediction]
+                        result.loc[i * total_tickers + j] = row
+                result.to_csv(get_config().TRAIN_PRED_PATH, index=False)
 
                 if get_config().TEST:
                     dt = build_time_axis(tst_raw_dates)
-                    plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, dt, tst_eq)
+                    if not get_config().HIDE_PLOTS:
+                        plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, dt, tst_eq)
 
-                show_plots()
+                if not get_config().HIDE_PLOTS:
+                    show_plots()
                 break
 
             if is_train() and epoch <= get_config().MAX_EPOCH:
 
-
                 # plot and save graphs
                 dt = build_time_axis(tr_raw_dates)
-                fig, tr_dd, tr_sharpe, tr_y_avg = plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, dt, tr_eq)
+                fig, tr_dd, tr_sharpe, tr_y_avg = plot_eq('Train', get_config().TRAIN_BEG, get_config().TRAIN_END, dt,
+                                                          tr_eq)
                 fig.savefig('%s/%04d.png' % (get_config().TRAIN_FIG_PATH, epoch))
                 plt.close(fig)
 
                 if get_config().TEST:
                     dt = build_time_axis(tst_raw_dates)
-                    fig, tst_dd, tst_sharpe, tst_y_avg = plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END, dt, tst_eq)
+                    fig, tst_dd, tst_sharpe, tst_y_avg = plot_eq('Test', get_config().TEST_BEG, get_config().TEST_END,
+                                                                 dt, tst_eq)
                     fig.savefig('%s/%04d.png' % (get_config().TEST_FIG_PATH, epoch))
                     plt.close(fig)
                 else:
@@ -333,17 +458,18 @@ def train(net):
                     if state is None:
                         state = net.zero_state(total_tickers)
 
-                    input, labels, mask = get_batch_slice(tr_input, tr_labels, tr_tradeable_mask, b)
+                    b_b_i, b_e_i = get_batch_range(b)
+                    _input = tr_input[:, b_b_i: b_e_i, :]
+                    _labels = tr_labels[:, b_b_i: b_e_i]
+                    _mask = tr_tradeable_mask[:, b_b_i: b_e_i]
 
                     if get_config().FIT_FRI_PREDICTION_ONLY:
-                        b_i = b * get_config().BPTT_STEPS
-                        e_i = (b + 1) * get_config().BPTT_STEPS
-                        batch_week_days = tr_week_days[b_i: e_i]
+                        batch_week_days = tr_week_days[b_b_i: b_e_i]
                         batch_mon_mask = batch_week_days == 5
-                        for i in range(mask.shape[0]):
-                            mask[i,:] = mask[i,:] & batch_mon_mask
+                        for i in range(_mask.shape[0]):
+                            _mask[i, :] = _mask[i, :] & batch_mon_mask
 
-                    state, loss, predictions = net.fit(state, input, labels, mask.astype(np.float32))
+                    state, loss, predictions = net.fit(state, _input, _labels, _mask.astype(np.float32))
 
                     curr_progress = progress.print_progress(curr_progress, b, tr_batch_num)
 
