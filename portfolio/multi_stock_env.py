@@ -47,7 +47,9 @@ class Env(object):
             if stk_idx is None:
                 continue
             _from = max(_from, HIST_BEG)
+            _from = min(_from, HIST_END)
             _to = min(_to, HIST_END)
+            _to = max(_to, HIST_BEG)
             _from_idx = _date_to_idx(_from)
             _to_idx = _date_to_idx(_to)
 
@@ -189,7 +191,7 @@ class Env(object):
         return self.tradable_mask[:,BEG_DATA_IDX: END_DATA_IDX + 1]
 
     def get_portfolio_mask(self, BEG_DATA_IDX, END_DATA_IDX):
-        if get_config().is_snp_index():
+        if get_config().is_snp_index() or get_config().is_all_stocks_index() or get_config().is_universal_net():
             return self.tradable_mask[:, BEG_DATA_IDX: END_DATA_IDX + 1] & self.snp_mask[:, BEG_DATA_IDX: END_DATA_IDX + 1]
         else:
             return self.get_tradeable_mask(BEG_DATA_IDX, END_DATA_IDX)

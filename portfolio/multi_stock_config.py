@@ -13,7 +13,8 @@ YR_07 = datetime.datetime.strptime('2007-01-01', '%Y-%m-%d').date()
 YR_10 = datetime.datetime.strptime('2010-01-01', '%Y-%m-%d').date()
 YR_15 = datetime.datetime.strptime('2015-01-01', '%Y-%m-%d').date()
 
-TODAY = datetime.datetime.strptime('2017-10-08', '%Y-%m-%d').date()
+# TODAY = datetime.datetime.strptime('2017-10-08', '%Y-%m-%d').date()
+TODAY = datetime.datetime.strptime('2017-10-15', '%Y-%m-%d').date()
 
 
 class Config(object):
@@ -64,11 +65,15 @@ class Config(object):
     FIT_FRI_PREDICTION_ONLY = True
     RESET_HIDDEN_STATE_FREQ = 0
 
+    # 5 bp
+    SLIPPAGE = 0
+    # SLIPPAGE = 5 / 100 / 100
+
     CAPM = False
     CAPM_USE_NET_PREDICTIONS = True
     COVARIANCE_LENGTH = 60
 
-    HIDE_PLOTS = False
+    HIDE_PLOTS = True
 
     PREDICTION_MODE = False
 
@@ -80,6 +85,9 @@ class Config(object):
 
     def is_all_stocks_index(self):
         return self.TICKER == 'ALL_STOCKS'
+
+    def is_universal_net(self):
+        return self.TICKER == 'UNIVERSAL_NET'
 
     def reload(self):
         self.WEIGHTS_FOLDER_PATH = 'nets/portfolio/stocks/%s' % self.TICKER
@@ -103,7 +111,7 @@ class Config(object):
         self.TRAIN_PRED_PATH = ('data/stocks/%s/train_prediction' % self.TICKER if self.RESET_HIDDEN_STATE_FREQ == 0 else 'data/stocks/%s/train_prediction_%d' % (self.TICKER, self.RESET_HIDDEN_STATE_FREQ)) + '.csv'
         self.TEST_PRED_PATH = ('data/stocks/%s/test_prediction' % self.TICKER if self.RESET_HIDDEN_STATE_FREQ == 0 else 'data/stocks/%s/test_prediction_%d' % (self.TICKER, self.RESET_HIDDEN_STATE_FREQ)) + '.csv'
 
-        if self.is_snp_index() or self.is_all_stocks_index():
+        if self.is_snp_index() or self.is_all_stocks_index() or self.is_universal_net():
             self.MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 30
         else:
             self.MIN_STOCKS_TRADABLE_PER_TRADING_DAY = 1
